@@ -16,49 +16,6 @@ const STORAGE_BUCKET = 'venture-assets';
 
 // --- Constants ---
 
-const PHASES = [
-  {
-    id: 'ideation',
-    title: 'Ideation & Problem',
-    tasks: [
-      { id: 'p1_1', label: 'Define the core problem statement' },
-      { id: 'p1_2', label: 'Identify target customer personas' },
-      { id: 'p1_3', label: 'Draft initial value proposition' },
-      { id: 'p1_4', label: 'Competitor analysis matrix' }
-    ]
-  },
-  {
-    id: 'discovery',
-    title: 'Customer Discovery',
-    tasks: [
-      { id: 'p2_1', label: 'Conduct 10 customer interviews' },
-      { id: 'p2_2', label: 'Synthesize interview insights' },
-      { id: 'p2_3', label: 'Validate problem assumptions' },
-      { id: 'p2_4', label: 'Refine solution hypothesis' }
-    ]
-  },
-  {
-    id: 'mvp',
-    title: 'MVP & Business Model',
-    tasks: [
-      { id: 'p3_1', label: 'Create Lean Canvas' },
-      { id: 'p3_2', label: 'Build low-fidelity prototype' },
-      { id: 'p3_3', label: 'Test prototype with 5 users' },
-      { id: 'p3_4', label: 'Define revenue model' }
-    ]
-  },
-  {
-    id: 'pitch',
-    title: 'The Final Pitch',
-    tasks: [
-      { id: 'p4_1', label: 'Draft pitch deck outline' },
-      { id: 'p4_2', label: 'Design visual slides' },
-      { id: 'p4_3', label: 'Practice pitch delivery' },
-      { id: 'p4_4', label: 'Final presentation' }
-    ]
-  }
-];
-
 // --- Mock Data & Client (Fallbacks) ---
 
 const MOCK_USER = { id: 'mock-user-1', email: 'student@university.edu' };
@@ -124,6 +81,41 @@ const MOCK_TRANSACTIONS = [
     { id: 't3', team_id: 'team-1', type: 'expense', amount: 45.00, description: 'Poster Printing', date: new Date().toISOString() }
 ];
 const MOCK_SETTINGS = { banner_message: 'Welcome to Demo Mode! Configure Supabase to go live.', pitch_date: new Date(Date.now() + 86400000 * 30).toISOString() };
+const MOCK_PHASES = [
+  {
+    id: 'ideation',
+    title: 'Ideation & Problem',
+    tasks: [
+      { id: 'p1_1', label: 'Define the core problem statement' },
+      { id: 'p1_2', label: 'Identify target customer personas' },
+      { id: 'p1_3', label: 'Draft initial value proposition' },
+      { id: 'p1_4', label: 'Competitor analysis matrix' }
+    ]
+  },
+  {
+    id: 'discovery',
+    title: 'Customer Discovery',
+    tasks: [
+      { id: 'p2_1', label: 'Conduct 10 customer interviews' },
+      { id: 'p2_2', label: 'Synthesize interview insights' },
+      { id: 'p2_3', label: 'Validate problem assumptions' },
+      { id: 'p2_4', label: 'Refine solution hypothesis' }
+    ]
+  },
+  {
+    id: 'mvp',
+    title: 'MVP & Business Model',
+    tasks: [
+      { id: 'p3_1', label: 'Create Lean Canvas' },
+      { id: 'p3_2', label: 'Build low-fidelity prototype' },
+      { id: 'p3_3', label: 'Test prototype with 5 users' },
+      { id: 'p3_4', label: 'Define revenue model' }
+    ]
+  }
+];
+const MOCK_COHORTS = [{ id: 'cohort-1', name: 'Demo Cohort' }];
+const MOCK_MILESTONE_PHASES = MOCK_PHASES.map((p, i) => ({ ...p, cohort_id: 'cohort-1', order: i, tasks: undefined }));
+const MOCK_MILESTONE_TASKS = MOCK_PHASES.flatMap(p => p.tasks.map((t, i) => ({ ...t, phase_id: p.id, order: i })));
 
 class MockSupabaseClient {
   constructor() {
@@ -131,6 +123,9 @@ class MockSupabaseClient {
     this.updates = [...MOCK_UPDATES];
     this.transactions = [...MOCK_TRANSACTIONS];
     this.settings = { ...MOCK_SETTINGS };
+    this.cohorts = [...MOCK_COHORTS];
+    this.milestone_phases = [...MOCK_MILESTONE_PHASES];
+    this.milestone_tasks = [...MOCK_MILESTONE_TASKS];
     this.subs = {};
   }
 
@@ -176,6 +171,9 @@ class MockSupabaseClient {
              if (table === 'teams') data = self.teams;
              if (table === 'updates') data = self.updates;
              if (table === 'transactions') data = self.transactions;
+             if (table === 'cohorts') data = self.cohorts;
+             if (table === 'milestone_phases') data = self.milestone_phases;
+             if (table === 'milestone_tasks') data = self.milestone_tasks;
              // Mock sort (simple)
              return { data, error: null };
           },
@@ -197,6 +195,9 @@ class MockSupabaseClient {
         if (table === 'teams') self.teams.unshift(row);
         if (table === 'updates') self.updates.unshift(row);
         if (table === 'transactions') self.transactions.unshift(row);
+        if (table === 'cohorts') self.cohorts.unshift(row);
+        if (table === 'milestone_phases') self.milestone_phases.unshift(row);
+        if (table === 'milestone_tasks') self.milestone_tasks.unshift(row);
         return { data: [row], error: null };
       },
       update: (updates) => {
@@ -210,6 +211,15 @@ class MockSupabaseClient {
                const idx = self.transactions.findIndex(t => t[col] === val);
                if (idx > -1) self.transactions[idx] = { ...self.transactions[idx], ...updates };
             }
+            if (table === 'milestone_phases') {
+                const idx = self.milestone_phases.findIndex(p => p[col] === val);
+                if (idx > -1) self.milestone_phases[idx] = { ...self.milestone_phases[idx], ...updates };
+            }
+            if (table === 'milestone_tasks') {
+                const idx = self.milestone_tasks.findIndex(t => t[col] === val);
+                if (idx > -1) self.milestone_tasks[idx] = { ...self.milestone_tasks[idx], ...updates };
+            }
+
             return { error: null };
           }
         }
@@ -220,6 +230,14 @@ class MockSupabaseClient {
                 if (table === 'transactions') {
                     const idx = self.transactions.findIndex(t => t[col] === val);
                     if (idx > -1) self.transactions.splice(idx, 1);
+                }
+                if (table === 'milestone_phases') {
+                    const idx = self.milestone_phases.findIndex(p => p[col] === val);
+                    if (idx > -1) self.milestone_phases.splice(idx, 1);
+                }
+                if (table === 'milestone_tasks') {
+                    const idx = self.milestone_tasks.findIndex(t => t[col] === val);
+                    if (idx > -1) self.milestone_tasks.splice(idx, 1);
                 }
                 return { error: null };
             }
@@ -385,12 +403,12 @@ const CountdownBanner = ({ targetDate, message }) => {
   );
 };
 
-const TeamCard = ({ team, onClick }) => {
+const TeamCard = ({ team, onClick, phases }) => {
   // Logic updated to count Approved tasks only
   const submissions = team.submissions || {};
-  const totalTasks = PHASES.reduce((acc, p) => acc + p.tasks.length, 0);
+  const totalTasks = phases.reduce((acc, p) => acc + p.tasks.length, 0);
   const approvedCount = Object.values(submissions).filter(s => s.status === 'approved').length;
-  const progress = Math.round((approvedCount / totalTasks) * 100);
+  const progress = totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
 
   return (
     <div 
@@ -706,7 +724,7 @@ const SubmissionModal = ({ task, existingSummary, onSubmit, onCancel }) => {
     );
 };
 
-const MilestoneTracker = ({ team, onSubmitTask, onReviewTask, onUploadProof, uploading, isAdmin, readOnly = false }) => {
+const MilestoneTracker = ({ team, phases, onSubmitTask, onReviewTask, onUploadProof, uploading, isAdmin, readOnly = false }) => {
     const submissions = team.submissions || {}; 
     const taskEvidence = team.task_evidence || {}; 
     const fileInputRef = useRef(null);
@@ -755,12 +773,12 @@ const MilestoneTracker = ({ team, onSubmitTask, onReviewTask, onUploadProof, upl
                 Venture Roadmap
             </h3>
             <span className="text-xs font-mono bg-neutral-800 border border-neutral-700 text-neutral-400 px-2 py-1 rounded">
-                {approvedCount} / {PHASES.reduce((a,b)=>a+b.tasks.length,0)} Approved
+                {approvedCount} / {phases.reduce((a,b)=>a+b.tasks.length,0)} Approved
             </span>
             </div>
             
             <div className="p-4 space-y-6">
-            {PHASES.map((phase, idx) => {
+            {phases.map((phase, idx) => {
                 const phaseTasks = phase.tasks;
                 const approvedInPhase = phaseTasks.filter(t => submissions[t.id]?.status === 'approved').length;
                 const isPhaseComplete = approvedInPhase === phaseTasks.length;
@@ -930,7 +948,10 @@ const ProfessorFeedback = ({ team, isAdmin, onPostFeedback, uploading }) => {
                 {sortedFeedback.map((item, idx) => (
                     <div key={idx} className="bg-neutral-950/50 border border-neutral-800 p-4 rounded-lg">
                         <div className="flex justify-between items-start mb-2">
-                            <span className="text-yellow-500 text-xs font-bold uppercase">Admin Note</span>
+                            <div>
+                                <span className="text-yellow-500 text-xs font-bold uppercase">Admin Note</span>
+                                {item.author_email && <span className="text-neutral-500 text-xs ml-2">— {item.author_email}</span>}
+                            </div>
                             <span className="text-neutral-500 text-[10px]">{new Date(item.created_at).toLocaleDateString()}</span>
                         </div>
                         <p className="text-neutral-300 text-sm whitespace-pre-wrap">{item.content}</p>
@@ -958,22 +979,223 @@ const TeamLogo = ({ url, name, className = "w-10 h-10 rounded-md", iconSize = "w
     );
 };
 
-const AdminDashboard = ({ teams = [], admins = [], settings, onUpdateSettings, onAddAdmin, onRemoveAdmin, onViewTeam, uploading }) => {
-    const [tab, setTab] = useState('overview');
+const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], settings, onUpdateSettings, onAddAdmin, onRemoveAdmin, onUpdateProfile, onViewTeam, onDeleteTeam, uploading }) => {
+    const [tab, setTab] = useState('cohorts');
     const [bannerMsg, setBannerMsg] = useState(settings?.banner_message || '');
     const [pitchDate, setPitchDate] = useState(settings?.pitch_date || '');
     const [newAdminEmail, setNewAdminEmail] = useState('');
+    const [userSearch, setUserSearch] = useState('');
+    const [teamToDelete, setTeamToDelete] = useState(null);
+    const [confirmName, setConfirmName] = useState('');
+    const [milestones, setMilestones] = useState([]);
+    const [cohorts, setCohorts] = useState([]);
+    const [newCohortName, setNewCohortName] = useState('');
+    const [selectedMilestoneCohort, setSelectedMilestoneCohort] = useState('');
+    const [copying, setCopying] = useState(false);
 
     useEffect(() => {
         if (settings) {
             setBannerMsg(settings.banner_message || '');
             setPitchDate(settings.pitch_date || '');
+            // Milestones are now fetched separately
         }
     }, [settings]);
 
+    useEffect(() => {
+        // Fetch cohorts when the component mounts or tab is switched to cohorts
+        if (tab === 'teams' || tab === 'cohorts' || tab === 'milestones') {
+            fetchCohorts();
+        }
+    }, [tab, supabase]);
+
+    useEffect(() => {
+        const fetchMilestonesForCohort = async () => {
+            if (!selectedMilestoneCohort) {
+                setMilestones([]);
+                return;
+            }
+            const { data: phaseData, error } = await supabase.from('milestone_phases').select('*, tasks:milestone_tasks(*)').eq('cohort_id', selectedMilestoneCohort).order('order');
+            if (error) {
+                console.error("Error fetching milestones for admin:", error);
+                setMilestones([]);
+            } else {
+                const sortedPhases = (phaseData || []).map(phase => ({ ...phase, tasks: (phase.tasks || []).sort((a, b) => a.order - b.order) }));
+                setMilestones(sortedPhases);
+            }
+        };
+
+        fetchMilestonesForCohort();
+    }, [selectedMilestoneCohort, supabase]);
+
     const saveSettings = () => {
-        onUpdateSettings({ ...settings, banner_message: bannerMsg, pitch_date: pitchDate });
+        onUpdateSettings({ id: settings?.id, banner_message: bannerMsg, pitch_date: pitchDate });
     };
+
+    const handleMilestoneChange = (phaseIndex, taskIndex, field, value) => {
+        const newMilestones = [...milestones];
+        let itemToUpdate;
+        if (taskIndex === null) {
+            itemToUpdate = newMilestones[phaseIndex];
+            itemToUpdate[field] = value;
+        } else {
+            itemToUpdate = newMilestones[phaseIndex].tasks[taskIndex];
+            itemToUpdate[field] = value;
+        }
+        setMilestones(newMilestones);
+    };
+
+    const handleMilestoneBlur = async (phaseIndex, taskIndex) => {
+        const newMilestones = [...milestones];
+        if (taskIndex === null) {
+            const phase = newMilestones[phaseIndex];
+            await supabase.from('milestone_phases').update({ title: phase.title }).eq('id', phase.id);
+        } else {
+            const task = newMilestones[phaseIndex].tasks[taskIndex];
+            await supabase.from('milestone_tasks').update({ label: task.label }).eq('id', task.id);
+        }
+        // No need to set state, it's already updated. 
+        // We could add a "saving..." indicator here in the future.
+    };
+
+
+    const addPhase = async () => {
+        if (!selectedMilestoneCohort) return;
+        const cohortId = selectedMilestoneCohort;
+
+        const { data } = await supabase.from('milestone_phases').insert([{ title: 'New Phase', order: milestones.length, cohort_id: cohortId }]).select();
+        if (data) setMilestones([...milestones, { ...data[0], tasks: [] }]);
+    };
+
+    const addTask = async (phaseIndex) => {
+        const phase = milestones[phaseIndex];
+        const { data } = await supabase.from('milestone_tasks').insert([{ label: 'New Task', order: phase.tasks.length, phase_id: phase.id }]).select();
+        if (data) {
+            const newMilestones = [...milestones];
+            newMilestones[phaseIndex].tasks.push(data[0]);
+            setMilestones(newMilestones);
+        }
+    };
+
+    const removePhase = async (phaseIndex) => {
+        const phase = milestones[phaseIndex];
+        await supabase.from('milestone_phases').delete().eq('id', phase.id);
+        const newMilestones = milestones.filter((_, i) => i !== phaseIndex);
+        setMilestones(newMilestones);
+    };
+
+    const removeTask = async (phaseIndex, taskIndex) => {
+        const task = milestones[phaseIndex].tasks[taskIndex];
+        await supabase.from('milestone_tasks').delete().eq('id', task.id);
+        
+        const newMilestones = [...milestones];
+        newMilestones[phaseIndex].tasks = newMilestones[phaseIndex].tasks.filter((_, i) => i !== taskIndex);
+        setMilestones(newMilestones);
+    };
+
+    const handleAssignCohort = async (teamId, cohortId) => {
+        const newCohortId = cohortId === '' ? null : cohortId;
+        const { error } = await supabase
+            .from('teams')
+            .update({ cohort_id: newCohortId })
+            .eq('id', teamId);
+        if (error) {
+            alert('Failed to assign cohort: ' + error.message);
+        }
+    };
+    const fetchCohorts = async () => {
+        const { data } = await supabase.from('cohorts').select('*').order('created_at', { ascending: false });
+        if (data) setCohorts(data);
+    };
+
+    const handleCreateCohort = async () => {
+        if (!newCohortName.trim()) return;
+        const { error } = await supabase.from('cohorts').insert([{ name: newCohortName }]);
+        if (!error) {
+            setNewCohortName('');
+            fetchCohorts();
+        } else {
+            alert("Failed to create cohort: " + error.message);
+        }
+    };
+
+    const handleCopyCohort = async (sourceCohortId) => {
+        const sourceCohort = cohorts.find(c => c.id === sourceCohortId);
+        if (!sourceCohort) return;
+
+        const newName = `Copy of ${sourceCohort.name}`;
+        setCopying(true);
+
+        try {
+            // 1. Create new cohort
+            const { data: newCohortData, error: cohortError } = await supabase.from('cohorts').insert([{ name: newName }]).select().single();
+            if (cohortError) throw cohortError;
+
+            // 2. Fetch phases and tasks from source cohort
+            const { data: sourcePhases, error: phasesError } = await supabase.from('milestone_phases').select('*, tasks:milestone_tasks(*)').eq('cohort_id', sourceCohortId);
+            if (phasesError) throw phasesError;
+
+            // 3. Create new phases and tasks
+            for (const phase of sourcePhases) {
+                const { tasks, ...phaseDetails } = phase;
+                const { data: newPhaseData, error: newPhaseError } = await supabase.from('milestone_phases').insert([{ ...phaseDetails, cohort_id: newCohortData.id, id: undefined, created_at: undefined }]).select().single();
+                if (newPhaseError) throw newPhaseError;
+
+                if (tasks && tasks.length > 0) {
+                    const newTasks = tasks.map(t => ({ ...t, phase_id: newPhaseData.id, id: undefined, created_at: undefined }));
+                    const { error: newTasksError } = await supabase.from('milestone_tasks').insert(newTasks);
+                    if (newTasksError) throw newTasksError;
+                }
+            }
+            fetchCohorts(); // Refresh list
+        } catch (error) {
+            alert("Failed to copy cohort: " + error.message);
+        } finally {
+            setCopying(false);
+        }
+    };
+
+    const handleCopyMilestones = async (sourceCohortId) => {
+        if (!sourceCohortId || !selectedMilestoneCohort) return;
+        setCopying(true);
+        try {
+            // 1. Fetch phases and tasks from source cohort
+            const { data: sourcePhases, error: phasesError } = await supabase.from('milestone_phases').select('*, tasks:milestone_tasks(*)').eq('cohort_id', sourceCohortId);
+            if (phasesError) throw phasesError;
+
+            // 2. Create new phases and tasks for the target cohort
+            for (const phase of sourcePhases) {
+                const { tasks, ...phaseDetails } = phase;
+                const { data: newPhaseData, error: newPhaseError } = await supabase.from('milestone_phases').insert([{ ...phaseDetails, cohort_id: selectedMilestoneCohort, id: undefined, created_at: undefined }]).select().single();
+                if (newPhaseError) throw newPhaseError;
+
+                if (tasks && tasks.length > 0) {
+                    const newTasks = tasks.map(t => ({ ...t, phase_id: newPhaseData.id, id: undefined, created_at: undefined }));
+                    const { error: newTasksError } = await supabase.from('milestone_tasks').insert(newTasks);
+                    if (newTasksError) throw newTasksError;
+                }
+            }
+            setSelectedMilestoneCohort(prev => prev); // Trigger refetch
+        } catch (error) {
+            alert("Failed to copy milestones: " + error.message);
+        } finally {
+            setCopying(false);
+        }
+    };
+
+    const handleDeleteCohort = async (cohortId) => {
+        const { error } = await supabase.from('cohorts').delete().eq('id', cohortId);
+        if (error) {
+            alert('Failed to delete cohort: ' + error.message);
+        } else {
+            // Also delete associated phases and tasks (handled by DB cascade)
+            // Refresh the cohort list
+            fetchCohorts();
+        }
+    };
+
+    const filteredProfiles = profiles.filter(p => 
+        p.email.toLowerCase().includes(userSearch.toLowerCase())
+    );
 
     return (
         <div className="p-8 max-w-6xl mx-auto">
@@ -983,7 +1205,7 @@ const AdminDashboard = ({ teams = [], admins = [], settings, onUpdateSettings, o
             </h1>
 
             <div className="flex gap-4 border-b border-neutral-800 mb-8">
-                {['overview', 'teams', 'users', 'settings'].map(t => (
+                {['overview', 'teams', 'users', 'cohorts', 'milestones', 'settings'].map(t => (
                     <button key={t} onClick={() => setTab(t)} className={`pb-3 px-2 text-sm font-bold uppercase tracking-wider transition ${tab === t ? 'text-yellow-500 border-b-2 border-yellow-500' : 'text-neutral-500 hover:text-white'}`}>
                         {t}
                     </button>
@@ -1014,30 +1236,236 @@ const AdminDashboard = ({ teams = [], admins = [], settings, onUpdateSettings, o
                                     <p className="text-xs text-neutral-500">{team.members?.length || 0} members</p>
                                 </div>
                             </div>
-                            <button onClick={() => onViewTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded border border-neutral-700 transition">
-                                View Dashboard
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <select
+                                    value={team.cohort_id || ''}
+                                    onChange={(e) => handleAssignCohort(team.id, e.target.value)}
+                                    className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs rounded-md px-2 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                                >
+                                    <option value="">Assign Cohort...</option>
+                                    {cohorts.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                                <button onClick={() => onViewTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition">
+                                    View Dashboard
+                                </button>
+                                <button 
+                                    onClick={() => setTeamToDelete(team)} 
+                                    className="text-xs bg-red-900/20 hover:bg-red-900/40 text-red-400 px-3 py-2 rounded-md border border-red-900/30 transition flex items-center gap-1"
+                                >
+                                    <Trash2 className="w-3 h-3" /> Delete
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>
             )}
 
+            {tab === 'cohorts' && (
+                <div className="grid md:grid-cols-2 gap-8">
+                    <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
+                        <h3 className="text-lg font-bold text-white mb-4">Create New Cohort</h3>
+                        <div className="flex gap-2">
+                            <input 
+                                className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white outline-none focus:border-yellow-500"
+                                placeholder="e.g., Fall 2024"
+                                value={newCohortName}
+                                onChange={(e) => setNewCohortName(e.target.value)}
+                            />
+                            <button onClick={handleCreateCohort} disabled={!newCohortName.trim() || uploading} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 disabled:opacity-50">
+                                Create
+                            </button>
+                        </div>
+                    </div>
+                    <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
+                        <h3 className="text-lg font-bold text-white mb-4">Existing Cohorts</h3>
+                        <div className="space-y-2 max-h-64 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-neutral-700">
+                            {cohorts.length === 0 && <p className="text-sm text-neutral-500 italic">No cohorts created yet.</p>}
+                            {cohorts.map(cohort => {
+                                const teamsInCohort = teams.filter(t => t.cohort_id === cohort.id);
+                                const canDelete = teamsInCohort.length === 0;
+
+                                return (
+                                    <div key={cohort.id} className="flex justify-between items-center bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                                        <div>
+                                            <p className="text-white font-medium">{cohort.name}</p>
+                                            <p className="text-xs text-neutral-500">{teamsInCohort.length} teams assigned</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button 
+                                                onClick={() => {
+                                                    if (window.confirm(`Are you sure you want to duplicate the '${cohort.name}' cohort and all its milestones?`)) {
+                                                        handleCopyCohort(cohort.id);
+                                                    }
+                                                }}
+                                                disabled={copying}
+                                                className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-1.5 rounded-md font-medium border border-neutral-700 disabled:opacity-50"
+                                            >
+                                                {copying ? 'Copying...' : 'Duplicate'}
+                                            </button>
+                                            <button 
+                                                onClick={() => {
+                                                    if (window.confirm(`Delete cohort '${cohort.name}'? This cannot be undone.`)) {
+                                                        handleDeleteCohort(cohort.id);
+                                                    }
+                                                }}
+                                                disabled={!canDelete}
+                                                className="text-xs bg-red-900/20 hover:bg-red-900/40 text-red-400 px-3 py-1.5 rounded-md font-medium border border-red-900/30 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-red-900/20"
+                                                title={canDelete ? 'Delete cohort' : 'Cannot delete cohort with assigned teams'}
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {tab === 'users' && (
-                <div className="bg-neutral-900 p-8 rounded-xl border border-neutral-800 max-w-2xl">
-                    <h3 className="text-xl font-bold text-white mb-6">Manage Admins</h3>
-                    <div className="flex gap-4 mb-6">
-                        <input type="email" placeholder="Enter email..." className="flex-1 bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white focus:border-yellow-500 outline-none" value={newAdminEmail} onChange={(e) => setNewAdminEmail(e.target.value)} />
-                        <button onClick={() => { onAddAdmin(newAdminEmail); setNewAdminEmail(''); }} disabled={!newAdminEmail || uploading} className="bg-yellow-600 text-black font-bold px-6 py-3 rounded-lg hover:bg-yellow-500 disabled:opacity-50">Add</button>
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-xl font-bold text-white">User Directory</h3>
+                        <input 
+                            type="text" 
+                            placeholder="Search users..." 
+                            className="bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-2 text-white text-sm focus:border-yellow-500 outline-none w-64"
+                            value={userSearch}
+                            onChange={(e) => setUserSearch(e.target.value)}
+                        />
                     </div>
-                    <div className="space-y-2">
-                        {admins.map(admin => (
-                            <div key={admin.id} className="bg-neutral-950/50 p-4 flex justify-between items-center rounded border border-neutral-800">
-                                <span className="text-white">{admin.email}</span>
-                                <button onClick={() => onRemoveAdmin(admin.id)} className="text-red-400 hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
+                    
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+                        <table className="w-full text-left text-sm text-neutral-400">
+                            <thead className="bg-neutral-950 text-neutral-500 uppercase text-xs font-bold">
+                                <tr>
+                                    <th className="p-4">User</th>
+                                    <th className="p-4">Teams</th>
+                                    <th className="p-4">Status</th>
+                                    <th className="p-4">Admin</th>
+                                    <th className="p-4">Admin Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-800">
+                                {filteredProfiles.map(profile => {
+                                    const isAdmin = admins.some(a => a.email === profile.email);
+                                    const userTeams = teams.filter(t => t.members?.includes(profile.id));
+                                    
+                                    return (
+                                        <tr key={profile.id} className="hover:bg-neutral-800/30 transition">
+                                            <td className="p-4 font-medium text-white">{profile.email}</td>
+                                            <td className="p-4">
+                                                <div className="flex flex-wrap gap-1">
+                                                    {userTeams.length > 0 ? userTeams.map(t => (
+                                                        <span key={t.id} className="px-2 py-0.5 bg-neutral-800 rounded text-xs text-neutral-300 border border-neutral-700">{t.name}</span>
+                                                    )) : <span className="text-neutral-600 italic text-xs">No Team</span>}
+                                                </div>
+                                            </td>
+                                            <td className="p-4">
+                                                <select 
+                                                    value={profile.status || 'active'}
+                                                    onChange={(e) => onUpdateProfile(profile.id, { status: e.target.value })}
+                                                    className={`bg-transparent border-none outline-none text-xs font-bold uppercase cursor-pointer ${profile.status === 'suspended' ? 'text-red-500' : 'text-green-500'}`}
+                                                >
+                                                    <option value="active">Active</option>
+                                                    <option value="suspended">Suspended</option>
+                                                </select>
+                                            </td>
+                                            <td className="p-4">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={isAdmin} 
+                                                    onChange={(e) => e.target.checked ? onAddAdmin(profile.email) : onRemoveAdmin(admins.find(a => a.email === profile.email)?.id)}
+                                                    className="rounded bg-neutral-800 border-neutral-700 text-yellow-600 focus:ring-yellow-600"
+                                                />
+                                            </td>
+                                            <td className="p-4">
+                                                <input 
+                                                    className="bg-neutral-950 border border-neutral-800 rounded px-2 py-1 text-xs text-white w-full focus:border-yellow-500 outline-none placeholder-neutral-700"
+                                                    placeholder="Add note..."
+                                                    defaultValue={profile.admin_notes || ''}
+                                                    onBlur={(e) => onUpdateProfile(profile.id, { admin_notes: e.target.value })}
+                                                />
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                {filteredProfiles.length === 0 && (
+                                    <tr><td colSpan="5" className="p-8 text-center text-neutral-600 italic">No users found.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {tab === 'milestones' && (
+                <div className="bg-neutral-900 p-8 rounded-xl border border-neutral-800">
+                    <h3 className="text-xl font-bold text-white mb-2">Edit Milestones</h3>
+                    <p className="text-sm text-neutral-400 mb-6">Select a cohort to configure its venture roadmap.</p>
+
+                    <div className="mb-6">
+                        <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Select Cohort</label>
+                        <select
+                            value={selectedMilestoneCohort}
+                            onChange={(e) => setSelectedMilestoneCohort(e.target.value)}
+                            className="w-full md:w-1/2 bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white outline-none focus:border-yellow-500"
+                        >
+                            <option value="">-- Choose a cohort --</option>
+                            {cohorts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                    </div>
+
+                    {selectedMilestoneCohort && (
+                        milestones.length > 0 ? (
+                            <div className="space-y-4 animate-fade-in">
+                                {milestones.map((phase, phaseIndex) => (
+                                    <div key={phase.id} className="bg-neutral-950 border border-neutral-800 rounded-lg p-4">
+                                        <div className="flex items-center justify-between mb-2 group">
+                                            <input 
+                                                className="text-lg font-bold text-white bg-transparent outline-none w-full"
+                                                value={phase.title}
+                                                onChange={(e) => handleMilestoneChange(phaseIndex, null, 'title', e.target.value)}
+                                                onBlur={() => handleMilestoneBlur(phaseIndex, null)}
+                                            />
+                                            <button onClick={() => removePhase(phaseIndex)} className="text-neutral-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition"><Trash2 className="w-4 h-4" /></button>
+                                        </div>
+                                        <div className="space-y-2 mt-4">
+                                            {phase.tasks.map((task, taskIndex) => (
+                                                <div key={task.id} className="flex items-center gap-2">
+                                                    <input 
+                                                        className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-sm text-white outline-none focus:border-yellow-500"
+                                                        value={task.label}
+                                                        onChange={(e) => handleMilestoneChange(phaseIndex, taskIndex, 'label', e.target.value)}
+                                                        onBlur={() => handleMilestoneBlur(phaseIndex, taskIndex)}
+                                                    />
+                                                    <button onClick={() => removeTask(phaseIndex, taskIndex)} className="text-neutral-600 hover:text-red-400"><X className="w-4 h-4" /></button>
+                                                </div>
+                                            ))}
+                                            <button onClick={() => addTask(phaseIndex)} className="text-sm text-yellow-500 hover:text-yellow-400 mt-2">+ Add Task</button>
+                                        </div>
+                                    </div>
+                                ))}
+                                <button onClick={addPhase} className="text-sm text-green-500 hover:text-green-400 mt-4">+ Add Phase</button>
                             </div>
-                        ))}
-                        {admins.length === 0 && <p className="text-neutral-600 italic">No additional admins.</p>}
-                    </div>
+                        ) : (
+                            <div className="text-center bg-neutral-950 border-2 border-dashed border-neutral-800 p-8 rounded-lg animate-fade-in">
+                                <h4 className="text-lg font-bold text-white">This cohort has no milestones.</h4>
+                                <p className="text-neutral-400 mb-6">Get started by creating new phases or copying from another cohort.</p>
+                                <div className="flex justify-center items-center gap-4">
+                                    <button onClick={addPhase} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500">Create First Phase</button>
+                                    <span className="text-neutral-600">or</span>
+                                    <select onChange={(e) => handleCopyMilestones(e.target.value)} disabled={copying} className="bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-md px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500">
+                                        <option value="">{copying ? 'Copying...' : 'Copy from...'}</option>
+                                        {cohorts.filter(c => c.id !== selectedMilestoneCohort).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                        )
+                    )}
                 </div>
             )}
 
@@ -1054,6 +1482,45 @@ const AdminDashboard = ({ teams = [], admins = [], settings, onUpdateSettings, o
                             <input type="datetime-local" className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white focus:border-yellow-500 outline-none" value={pitchDate ? new Date(pitchDate).toISOString().slice(0, 16) : ''} onChange={e => setPitchDate(e.target.value)} />
                         </div>
                         <button onClick={saveSettings} disabled={uploading} className="bg-yellow-600 text-black font-bold px-6 py-2 rounded-lg hover:bg-yellow-500 disabled:opacity-50">{uploading ? 'Saving...' : 'Save Settings'}</button>
+                    </div>
+                </div>
+            )}
+
+            {teamToDelete && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 w-full max-w-md shadow-2xl">
+                        <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                            <AlertCircle className="w-5 h-5 text-red-500" />
+                            Delete Team
+                        </h3>
+                        <p className="text-sm text-neutral-400 mb-4">
+                            Are you sure you want to delete <strong>{teamToDelete.name}</strong>? 
+                            This action cannot be undone and will remove all team data (updates, transactions, milestones). Users will not be deleted.
+                        </p>
+                        <label className="block text-xs font-bold text-neutral-500 uppercase mb-2">
+                            Type team name to confirm
+                        </label>
+                        <input 
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white text-sm focus:border-red-500 outline-none mb-4"
+                            placeholder={teamToDelete.name}
+                            value={confirmName}
+                            onChange={(e) => setConfirmName(e.target.value)}
+                        />
+                        <div className="flex justify-end gap-3">
+                            <button 
+                                onClick={() => { setTeamToDelete(null); setConfirmName(''); }}
+                                className="px-4 py-2 text-neutral-400 hover:text-white text-sm"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={() => { onDeleteTeam(teamToDelete.id); setTeamToDelete(null); setConfirmName(''); }}
+                                disabled={confirmName !== teamToDelete.name || uploading}
+                                className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-500 disabled:opacity-50"
+                            >
+                                {uploading ? 'Deleting...' : 'Delete Team'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -1328,11 +1795,12 @@ const FinanceDashboard = ({ teamId, transactions, onAddTransaction, onUpdateTran
 
 // --- New Public Team Profile Component ---
 
-const PublicTeamProfile = ({ team, updates, totalTasks }) => {
+const PublicTeamProfile = ({ team, updates, phases }) => {
     // Calculate Score
+    const totalTasks = phases.reduce((acc, p) => acc + p.tasks.length, 0);
     const submissions = team.submissions || {};
     const approvedCount = Object.values(submissions).filter(s => s.status === 'approved').length;
-    const score = Math.round((approvedCount / totalTasks) * 100);
+    const score = totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
 
     // Extract images from updates for the gallery
     const galleryImages = updates
@@ -1432,6 +1900,7 @@ const PublicTeamProfile = ({ team, updates, totalTasks }) => {
                         <h3 className="text-lg font-bold text-white mb-4">Milestone Progress</h3>
                         <MilestoneTracker 
                             team={team} 
+                            phases={phases}
                             readOnly={true} 
                             isAdmin={false}
                         />
@@ -1457,7 +1926,9 @@ const VentureTracker = ({ supabase, isMock }) => {
   const [updates, setUpdates] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [adminList, setAdminList] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [settings, setSettings] = useState(null);
+  const [phases, setPhases] = useState([]);
   
   const [view, setView] = useState('dashboard'); // 'dashboard', 'all-teams', 'finances', 'team-summary'
   const [viewingTeam, setViewingTeam] = useState(null); // The team being viewed in public directory
@@ -1486,12 +1957,13 @@ const VentureTracker = ({ supabase, isMock }) => {
   useEffect(() => {
     if (!session) return;
 
-    // Fetch Settings
+    // Fetch Settings (runs once)
     supabase.from('settings').select('*').single().then(({ data }) => setSettings(data));
 
     // Initial Fetch Teams
     fetchTeams();
     fetchAdmins();
+    fetchProfiles();
 
     // Set up Realtime Subscription for Teams
     const teamsSub = supabase.channel('public:teams')
@@ -1501,7 +1973,32 @@ const VentureTracker = ({ supabase, isMock }) => {
       .subscribe();
 
     return () => { supabase.removeChannel(teamsSub); };
-  }, [session, supabase]);
+  }, [session]);
+
+  // Fetch milestones based on the current team's cohort
+  useEffect(() => {
+    const fetchPhasesForTeam = async () => {
+      const team = view === 'team-summary' ? viewingTeam : myTeam;
+      if (!team || !team.cohort_id) {
+        setPhases([]); // Clear phases if no team or cohort
+        return;
+      }
+
+      const { data: phaseData, error } = await supabase.from('milestone_phases').select('*, tasks:milestone_tasks(*)').eq('cohort_id', team.cohort_id).order('order');
+      if (error) {
+        console.error("Error fetching milestones:", error);
+        setPhases([]);
+        return;
+      }
+      const sortedPhases = (phaseData || []).map(phase => ({
+        ...phase,
+        tasks: (phase.tasks || []).sort((a, b) => a.order - b.order)
+      }));
+      setPhases(sortedPhases);
+    };
+
+    fetchPhasesForTeam();
+  }, [myTeam, viewingTeam, view]);
 
   const fetchTeams = async () => {
     const { data } = await supabase.from('teams').select('*').order('created_at', { ascending: false });
@@ -1521,6 +2018,11 @@ const VentureTracker = ({ supabase, isMock }) => {
           if (isAdminUser && !myTeam) setView('admin-dashboard');
           if (isAdminUser) setIsAdmin(true);
       }
+  };
+
+  const fetchProfiles = async () => {
+      const { data } = await supabase.from('profiles').select('*');
+      if (data) setProfiles(data);
   };
 
   // 3. Fetch Updates & Transactions based on current view/team context
@@ -1563,7 +2065,7 @@ const VentureTracker = ({ supabase, isMock }) => {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(updatesSub); };
+    return () => { supabase.removeChannel(updatesSub); }; // This might need a more robust key if view changes fast
   }, [myTeam, viewingTeam, view, supabase]);
 
 
@@ -1689,7 +2191,8 @@ const VentureTracker = ({ supabase, isMock }) => {
           id: Math.random().toString(),
           content,
           created_at: new Date().toISOString(),
-          author_id: session.user.id
+          author_id: session.user.id,
+          author_email: session.user.email
       };
       const currentFeedback = myTeam.feedback || [];
       const updatedFeedback = [newNote, ...currentFeedback];
@@ -1705,11 +2208,41 @@ const VentureTracker = ({ supabase, isMock }) => {
   };
 
   const handleUpdateSettings = async (newSettings) => {
-      setSettings(newSettings);
       setUploading(true);
+      // Destructure to remove milestones from the object before saving to the 'settings' table.
+      const { milestones, ...settingsToSave } = newSettings;
       const query = supabase.from('settings');
-      const { error } = newSettings.id ? await query.update(newSettings).eq('id', newSettings.id) : await query.insert([newSettings]);
+      
+      let opError;
+      if (settingsToSave.id) {
+          const { error } = await query.update(settingsToSave).eq('id', settingsToSave.id);
+          opError = error;
+      } else {
+          const { error } = await query.insert([settingsToSave]);
+          opError = error;
+      }
+      
+      if (!opError) {
+          // Re-fetch: If we have ID, use it. If not, get the latest created.
+          let fetchQuery = supabase.from('settings').select('*');
+          if (settingsToSave.id) {
+              fetchQuery = fetchQuery.eq('id', settingsToSave.id).single();
+          } else {
+              fetchQuery = fetchQuery.order('created_at', { ascending: false }).limit(1).single();
+          }
+          const { data } = await fetchQuery;
+          if (data) setSettings(data);
+      } else {
+          console.error("Error updating settings:", opError);
+          alert("Failed to save settings");
+      }
       setUploading(false);
+  };
+
+  const handleUpdateProfile = async (id, updates) => {
+      setProfiles(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+      const { error } = await supabase.from('profiles').update(updates).eq('id', id);
+      if (error) console.error("Error updating profile:", error);
   };
 
   const handleAddAdmin = async (email) => {
@@ -1729,6 +2262,30 @@ const VentureTracker = ({ supabase, isMock }) => {
       setMyTeam(team);
       setView('dashboard');
       setIsAdmin(true);
+  };
+
+  const handleDeleteTeam = async (teamId) => {
+      setUploading(true);
+      
+      // 1. Delete Updates
+      const { error: updatesError } = await supabase.from('updates').delete().eq('team_id', teamId);
+      if (updatesError) console.error("Error deleting updates:", updatesError);
+
+      // 2. Delete Transactions
+      const { error: txError } = await supabase.from('transactions').delete().eq('team_id', teamId);
+      if (txError) console.error("Error deleting transactions:", txError);
+
+      // 3. Delete Team
+      const { error } = await supabase.from('teams').delete().eq('id', teamId);
+      
+      if (!error) {
+          setAllTeams(prev => prev.filter(t => t.id !== teamId));
+          if (myTeam?.id === teamId) setMyTeam(null);
+          if (viewingTeam?.id === teamId) setViewingTeam(null);
+      } else {
+          alert("Failed to delete team: " + error.message);
+      }
+      setUploading(false);
   };
 
   const handleResetToMyTeam = () => {
@@ -1776,10 +2333,13 @@ const VentureTracker = ({ supabase, isMock }) => {
                   </div>
               </header>
               <AdminDashboard 
-                  teams={allTeams} admins={adminList} settings={settings}
+                  teams={allTeams} admins={adminList} profiles={profiles} settings={settings}
                   onUpdateSettings={handleUpdateSettings}
+                  onUpdateProfile={handleUpdateProfile}
                   onAddAdmin={handleAddAdmin} onRemoveAdmin={handleRemoveAdmin}
-                  onViewTeam={handleAdminViewTeam} uploading={uploading}
+                  onViewTeam={handleAdminViewTeam} onDeleteTeam={handleDeleteTeam}
+                  uploading={uploading}
+                  supabase={supabase}
               />
           </div>
       );
@@ -1806,9 +2366,9 @@ const VentureTracker = ({ supabase, isMock }) => {
   // Header Logic
   const currentDisplayTeam = view === 'team-summary' ? viewingTeam : myTeam;
   const submissions = currentDisplayTeam?.submissions || {};
-  const totalTasks = PHASES.reduce((acc, p) => acc + p.tasks.length, 0);
+  const totalTasks = phases.reduce((acc, p) => acc + p.tasks.length, 0);
   const approvedCount = Object.values(submissions).filter(s => s.status === 'approved').length;
-  const progressPercent = Math.round((approvedCount / totalTasks) * 100);
+  const progressPercent = totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-black">
@@ -1920,6 +2480,7 @@ const VentureTracker = ({ supabase, isMock }) => {
                     </div>
                     <MilestoneTracker 
                         team={myTeam} 
+                        phases={phases}
                         onSubmitTask={handleSubmitTask} 
                         onReviewTask={handleReviewTask}
                         onUploadProof={handleUploadProof} 
@@ -1950,7 +2511,7 @@ const VentureTracker = ({ supabase, isMock }) => {
                 <PublicTeamProfile 
                     team={viewingTeam} 
                     updates={updates} 
-                    totalTasks={PHASES.reduce((a,b)=>a+b.tasks.length,0)} 
+                    phases={phases} 
                 />
             )}
 
@@ -1970,6 +2531,7 @@ const VentureTracker = ({ supabase, isMock }) => {
                     <TeamCard 
                         key={team.id} 
                         team={team} 
+                        phases={phases}
                         onClick={() => {
                             setViewingTeam(team);
                             setView('team-summary');
