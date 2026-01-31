@@ -1004,6 +1004,11 @@ const VentureTracker = ({ supabase, isMock }) => {
   const approvedCount = Object.values(submissions).filter(s => s.status === 'approved').length;
   const progressPercent = totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
 
+  const handleHomeNav = () => {
+    setView(isAuthorizedAdmin ? 'admin-dashboard' : 'dashboard');
+    setSidebarOpen(false);
+  };
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-black text-white">
       {isMock && (
@@ -1014,10 +1019,13 @@ const VentureTracker = ({ supabase, isMock }) => {
       <CountdownBanner targetDate={settings?.pitch_date} message={settings?.banner_message} />
       {/* Mobile Top Bar */}
       <div className="md:hidden bg-neutral-950 border-b border-neutral-800 px-4 py-3 flex items-center justify-between sticky top-0 z-20 w-full">
-        <div className="flex items-center gap-2">
+        <button
+          onClick={handleHomeNav}
+          className="flex items-center gap-2 hover:text-white"
+        >
           <Rocket className="w-5 h-5 text-yellow-500" />
           <span className="font-bold text-white">VentureTracker</span>
-        </div>
+        </button>
         <button
           onClick={() => setSidebarOpen(true)}
           className="text-sm text-neutral-300 border border-neutral-800 px-3 py-1.5 rounded-lg hover:bg-neutral-900"
@@ -1030,10 +1038,13 @@ const VentureTracker = ({ supabase, isMock }) => {
         {/* Sidebar */}
         <aside className={`md:w-64 bg-neutral-950 border-r border-neutral-800 flex-shrink-0 flex flex-col h-full md:static fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
             <div className="p-6 border-b border-neutral-800">
-            <div className="flex items-center gap-2 mb-1">
+            <button
+              onClick={handleHomeNav}
+              className="flex items-center gap-2 mb-1 hover:text-white"
+            >
                 <Rocket className="w-6 h-6 text-yellow-500" />
                 <span className="font-bold text-white">VentureTracker</span>
-            </div>
+            </button>
             <p className="text-xs text-neutral-500">Class of Spring 2026</p>
             </div>
             <div className="p-4 space-y-6">
