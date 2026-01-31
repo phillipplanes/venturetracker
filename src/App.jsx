@@ -1012,20 +1012,21 @@ const VentureTracker = ({ supabase, isMock }) => {
           </div>
       )}
       <CountdownBanner targetDate={settings?.pitch_date} message={settings?.banner_message} />
-      <div className="flex flex-1 overflow-hidden">
-        {/* Mobile Top Bar */}
-        <div className="md:hidden bg-neutral-950 border-b border-neutral-800 px-4 py-3 flex items-center justify-between sticky top-0 z-20 w-full">
-          <div className="flex items-center gap-2">
-            <Rocket className="w-5 h-5 text-yellow-500" />
-            <span className="font-bold text-white">VentureTracker</span>
-          </div>
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-sm text-neutral-300 border border-neutral-800 px-3 py-1.5 rounded-lg hover:bg-neutral-900"
-          >
-            Menu
-          </button>
+      {/* Mobile Top Bar */}
+      <div className="md:hidden bg-neutral-950 border-b border-neutral-800 px-4 py-3 flex items-center justify-between sticky top-0 z-20 w-full">
+        <div className="flex items-center gap-2">
+          <Rocket className="w-5 h-5 text-yellow-500" />
+          <span className="font-bold text-white">VentureTracker</span>
         </div>
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="text-sm text-neutral-300 border border-neutral-800 px-3 py-1.5 rounded-lg hover:bg-neutral-900"
+        >
+          Menu
+        </button>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside className={`md:w-64 bg-neutral-950 border-r border-neutral-800 flex-shrink-0 flex flex-col h-full md:static fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
             <div className="p-6 border-b border-neutral-800">
@@ -1079,7 +1080,7 @@ const VentureTracker = ({ supabase, isMock }) => {
         )}
 
         {/* Main */}
-        <main className="flex-1 overflow-y-auto bg-black">
+        <main className="flex-1 overflow-y-auto bg-black w-full">
             <header className="bg-neutral-950 border-b border-neutral-800 px-8 py-6 flex items-center gap-4">
                 {view === 'team-summary' && (
                     <button 
