@@ -2,6 +2,7 @@ import React from 'react';
 import { Image as ImageIcon } from 'lucide-react';
 import MilestoneTracker from './MilestoneTracker';
 import UpdateFeed from './UpdateFeed';
+import TeamLogo from './TeamLogo';
 
 const PublicTeamProfile = ({ team, updates, phases }) => {
     // Calculate Score
@@ -15,8 +16,8 @@ const PublicTeamProfile = ({ team, updates, phases }) => {
 
     // Extract images from updates for the gallery
     const galleryImages = updates
-        .filter(u => u.image_url)
-        .map(u => ({ url: u.image_url, date: u.created_at, caption: u.content }));
+        .filter(u => u.image_display_url || u.image_url)
+        .map(u => ({ url: u.image_display_url || u.image_url, date: u.created_at, caption: u.content }));
 
     return (
         <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
@@ -27,9 +28,12 @@ const PublicTeamProfile = ({ team, updates, phases }) => {
                 <div className="relative z-10 flex flex-col md:flex-row justify-between gap-6">
                     <div className="flex-1">
                         <div className="flex items-center gap-4 mb-4">
-                            {team.logo_url && (
-                                <img src={team.logo_url} alt={team.name} className="w-16 h-16 rounded-xl object-cover border border-neutral-700 shadow-lg bg-neutral-800" />
-                            )}
+                            <TeamLogo
+                                url={team.logo_display_url || team.logo_url}
+                                name={team.name}
+                                className="w-16 h-16 rounded-xl"
+                                iconSize="w-6 h-6"
+                            />
                             <div>
                             <h1 className="text-4xl font-bold text-white tracking-tight">{team.name}</h1>
                             <span className="px-3 py-1 rounded-full bg-yellow-900/30 border border-yellow-700/50 text-yellow-500 text-xs font-bold uppercase tracking-wider">

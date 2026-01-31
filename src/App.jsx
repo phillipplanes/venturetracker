@@ -16,6 +16,7 @@ import FinanceDashboard from './components/FinanceDashboard';
 import PublicTeamProfile from './components/PublicTeamProfile';
 import TeamCard from './components/TeamCard';
 import TeamLogo from './components/TeamLogo';
+import TeamProfileModal from './components/TeamProfileModal';
 // REMOVED: import { createClient } from '@supabase/supabase-js'; (Not supported in this environment without build step)
 
 // --- Configuration ---
@@ -148,6 +149,18 @@ class MockSupabaseClient {
        alert(`[DEMO] Magic link sent to ${email} (Check console to see pseudo-login)`);
        return { error: null };
     },
+    signInWithPassword: async ({ email }) => {
+       alert(`[DEMO] Signed in as ${email}`);
+       return { error: null };
+    },
+    signUp: async ({ email }) => {
+       alert(`[DEMO] Account created for ${email}`);
+       return { error: null };
+    },
+    signInWithOAuth: async () => {
+       alert(`[DEMO] OAuth login initiated.`);
+       return { error: null };
+    },
     signOut: async () => { window.location.reload(); },
     onAuthStateChange: (cb) => {
       // Small delay to simulate async auth check
@@ -185,10 +198,29 @@ class MockSupabaseClient {
              if (table === 'updates') data = self.updates;
              if (table === 'transactions') data = self.transactions;
              if (table === 'cohorts') data = self.cohorts;
-             if (table === 'milestone_phases') data = self.milestone_phases;
+             if (table === 'milestone_phases') data = self.milestone_phases.map(p => ({
+               ...p,
+               tasks: self.milestone_tasks.filter(t => t.phase_id === p.id)
+             }));
              if (table === 'milestone_tasks') data = self.milestone_tasks;
              // Mock sort (simple)
              return { data, error: null };
+          },
+          in: (col, values) => {
+             return {
+                 order: async () => {
+                    let data = [];
+                    if (table === 'milestone_phases') {
+                      data = self.milestone_phases
+                        .filter(p => values.includes(p[col]))
+                        .map(p => ({
+                          ...p,
+                          tasks: self.milestone_tasks.filter(t => t.phase_id === p.id)
+                        }));
+                    }
+                    return { data, error: null };
+                 }
+             }
           },
           eq: (col, val) => {
              return {
@@ -196,6 +228,14 @@ class MockSupabaseClient {
                     let data = [];
                     if (table === 'updates') data = self.updates;
                     if (table === 'transactions') data = self.transactions;
+                    if (table === 'milestone_phases') {
+                      data = self.milestone_phases
+                        .filter(p => p[col] === val)
+                        .map(p => ({
+                          ...p,
+                          tasks: self.milestone_tasks.filter(t => t.phase_id === p.id)
+                        }));
+                    }
                     
                     return { data: data.filter(u => u[col] === val), error: null };
                  }
@@ -287,6 +327,7 @@ const VentureTracker = ({ supabase, isMock }) => {
   const [settings, setSettings] = useState(null);
   const [phases, setPhases] = useState([]);
   const [cohortPhasesById, setCohortPhasesById] = useState({});
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
   
   const [view, setView] = useState('dashboard'); // 'dashboard', 'all-teams', 'finances', 'team-summary'
   const [viewingTeam, setViewingTeam] = useState(null); // The team being viewed in public directory
@@ -333,6 +374,12 @@ const VentureTracker = ({ supabase, isMock }) => {
     return () => { supabase.removeChannel(teamsSub); };
   }, [session]);
 
+  useEffect(() => {
+    if (myTeam?.logo_url) {
+      console.log('[Team Logo URL]', myTeam.logo_url);
+    }
+  }, [myTeam?.logo_url]);
+
   // Fetch milestones based on the current team's cohort
   useEffect(() => {
     const fetchTeamData = async () => {
@@ -368,7 +415,7 @@ const VentureTracker = ({ supabase, isMock }) => {
 
   // Fetch cohort-specific milestones for the class directory cards
   useEffect(() => {
-    if (view !== 'all-teams') return;
+    if (view !== 'all-teams' && view !== 'admin-dashboard') return;
     const cohortIds = Array.from(new Set(allTeams.map(t => t.cohort_id).filter(Boolean)));
     if (cohortIds.length === 0) {
       setCohortPhasesById({});
@@ -402,8 +449,25 @@ const VentureTracker = ({ supabase, isMock }) => {
   const fetchTeams = async () => {
     const { data } = await supabase.from('teams').select('*, team_submissions(*)').order('created_at', { ascending: false });
     if (data) {
-        setAllTeams(data);
-        const mine = data.find(t => t.members && t.members.includes(session.user.id));
+        const enriched = await Promise.all(
+          data.map(async (team) => {
+            const evidence = team.task_evidence || {};
+            const evidenceEntries = await Promise.all(
+              Object.entries(evidence).map(async ([taskId, value]) => {
+                const signed = await getSignedAssetUrl(value);
+                const name = value ? value.split('/').pop() : '';
+                return [taskId, { url: signed, name }];
+              })
+            );
+            return {
+              ...team,
+              logo_display_url: await getSignedAssetUrl(team.logo_url),
+              task_evidence_display: Object.fromEntries(evidenceEntries)
+            };
+          })
+        );
+        setAllTeams(enriched);
+        const mine = enriched.find(t => t.members && t.members.includes(session.user.id));
         setMyTeam(mine);
     }
   };
@@ -435,7 +499,15 @@ const VentureTracker = ({ supabase, isMock }) => {
             .select('*')
             .eq('team_id', targetTeamId)
             .order('created_at', { ascending: false });
-        if (data) setUpdates(data);
+        if (data) {
+            const enriched = await Promise.all(
+              data.map(async (u) => ({
+                ...u,
+                image_display_url: await getSignedAssetUrl(u.image_url)
+              }))
+            );
+            setUpdates(enriched);
+        }
     };
 
     const fetchTransactions = async () => {
@@ -459,7 +531,11 @@ const VentureTracker = ({ supabase, isMock }) => {
     const updatesSub = supabase.channel('public:updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'updates', filter: `team_id=eq.${targetTeamId}` }, (payload) => {
           if (payload.eventType === 'INSERT') {
-            setUpdates(prev => [payload.new, ...prev]);
+            const addUpdate = async () => {
+              const image_display_url = await getSignedAssetUrl(payload.new.image_url);
+              setUpdates(prev => [{ ...payload.new, image_display_url }, ...prev]);
+            };
+            addUpdate();
           }
       })
       .subscribe();
@@ -467,6 +543,41 @@ const VentureTracker = ({ supabase, isMock }) => {
     return () => { supabase.removeChannel(updatesSub); }; // This might need a more robust key if view changes fast
   }, [myTeam, viewingTeam, view, supabase]);
 
+
+  const getStoragePathInfo = (value) => {
+    if (!value) return null;
+    if (!value.startsWith('http')) {
+      return { bucket: STORAGE_BUCKET, path: value };
+    }
+    try {
+      const url = new URL(value);
+      const parts = url.pathname.split('/').filter(Boolean);
+      // Supports:
+      // /storage/v1/object/public/{bucket}/{path}
+      // /storage/v1/render/image/public/{bucket}/{path}
+      const publicIdx = parts.indexOf('public');
+      if (publicIdx > -1 && parts.length > publicIdx + 1) {
+        const bucket = parts[publicIdx + 1];
+        const path = parts.slice(publicIdx + 2).join('/');
+        if (bucket && path) return { bucket, path };
+      }
+    } catch (e) {
+      console.error('Invalid logo URL:', value);
+    }
+    return null;
+  };
+
+  const getSignedAssetUrl = async (value) => {
+    const info = getStoragePathInfo(value);
+    if (!info) return value || null;
+    const { data, error } = await supabase.storage.from(info.bucket).createSignedUrl(info.path, 60 * 60);
+    if (error) {
+      console.error('Signed URL Error:', error);
+      // If object is missing, fall back to the original value to avoid breaking the UI
+      return value || null;
+    }
+    return data?.signedUrl || null;
+  };
 
   // --- Helper: Upload File ---
   const uploadFile = async (file, pathPrefix) => {
@@ -480,17 +591,8 @@ const VentureTracker = ({ supabase, isMock }) => {
       return null;
     }
     
-    // Use Supabase Image Transformations to enforce size and type
-    const { data: { publicUrl } } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(fileName, {
-        transform: {
-            width: 500,
-            height: 500,
-            resize: 'cover',
-            format: 'webp',
-            quality: 80
-        }
-    });
-    return publicUrl;
+    // Store the path; generate signed URLs for display as needed
+    return fileName;
   };
 
   // --- Actions ---
@@ -512,7 +614,9 @@ const VentureTracker = ({ supabase, isMock }) => {
     }]).select();
 
     if (!error && data) {
-        setMyTeam(data[0]); // Optimistic update
+        const created = data[0];
+        const logo_display_url = await getSignedAssetUrl(created.logo_url);
+        setMyTeam({ ...created, logo_display_url }); // Optimistic update
         setView('dashboard');
     }
   };
@@ -566,8 +670,15 @@ const VentureTracker = ({ supabase, isMock }) => {
     }
   };
 
-  const handleSubmitTask = async (taskId, summary) => {
+  const handleSubmitTask = async (taskId, summary, file) => {
     if (!myTeam) return;
+
+    setUploading(true);
+    let evidencePath = null;
+    if (file) {
+        const safeName = file.name.replace(/\s/g, '_');
+        evidencePath = await uploadFile(file, `team_${myTeam.id}/proof/${safeName}`);
+    }
 
     const submissionData = {
         team_id: myTeam.id,
@@ -593,10 +704,19 @@ const VentureTracker = ({ supabase, isMock }) => {
         };
         setMyTeam(updateSubmissions);
         setAllTeams(prev => prev.map(t => t.id === myTeam.id ? updateSubmissions(t) : t));
+
+        if (evidencePath) {
+            const signed = await getSignedAssetUrl(evidencePath);
+            const newEvidence = { ...(myTeam.task_evidence || {}), [taskId]: evidencePath };
+            const newEvidenceDisplay = { ...(myTeam.task_evidence_display || {}), [taskId]: { url: signed, name: file.name } };
+            setMyTeam(prev => ({ ...prev, task_evidence: newEvidence, task_evidence_display: newEvidenceDisplay }));
+            await supabase.from('teams').update({ task_evidence: newEvidence }).eq('id', myTeam.id);
+        }
     } else {
         console.error("Error submitting task:", error);
         alert("Failed to submit task. Please check the console.");
     }
+    setUploading(false);
   };
 
   const handleReviewTask = async (teamId, taskId, decision, feedback) => {
@@ -629,10 +749,16 @@ const VentureTracker = ({ supabase, isMock }) => {
   const handleUploadProof = async (taskId, file) => {
       if (!myTeam || !file) return;
       setUploading(true);
-      const publicUrl = await uploadFile(file, `team_${myTeam.id}/proof`);
-      if (publicUrl) {
-        const newEvidence = { ...(myTeam.task_evidence || {}), [taskId]: publicUrl };
-        setMyTeam(prev => ({ ...prev, task_evidence: newEvidence }));
+      const safeName = file.name.replace(/\s/g, '_');
+      const path = await uploadFile(file, `team_${myTeam.id}/proof/${safeName}`);
+      if (path) {
+        const newEvidence = { ...(myTeam.task_evidence || {}), [taskId]: path };
+        const signed = await getSignedAssetUrl(path);
+        const newEvidenceDisplay = {
+          ...(myTeam.task_evidence_display || {}),
+          [taskId]: { url: signed, name: file.name }
+        };
+        setMyTeam(prev => ({ ...prev, task_evidence: newEvidence, task_evidence_display: newEvidenceDisplay }));
         await supabase.from('teams').update({ task_evidence: newEvidence }).eq('id', myTeam.id);
       }
       setUploading(false);
@@ -698,6 +824,30 @@ const VentureTracker = ({ supabase, isMock }) => {
       if (error) console.error("Error updating profile:", error);
   };
 
+  const handleUpdateTeamProfile = async ({ description, logoFile }) => {
+      if (!myTeam) return;
+      setUploading(true);
+      let logo_url = myTeam.logo_url;
+      if (logoFile) {
+          logo_url = await uploadFile(logoFile, 'team-logos');
+      }
+      if (logo_url) console.log('[Team Logo URL]', logo_url);
+      const updates = { description: description.trim(), logo_url };
+      const { error } = await supabase.from('teams').update(updates).eq('id', myTeam.id);
+      if (error) {
+          console.error("Error updating team profile:", error);
+          alert("Failed to update team profile. Check the console.");
+      } else {
+          const logo_display_url = await getSignedAssetUrl(logo_url);
+          const nextTeam = { ...updates, logo_display_url };
+          setMyTeam(prev => (prev ? { ...prev, ...nextTeam } : prev));
+          setAllTeams(prev => prev.map(t => (t.id === myTeam.id ? { ...t, ...nextTeam } : t)));
+          setViewingTeam(prev => (prev && prev.id === myTeam.id ? { ...prev, ...nextTeam } : prev));
+          setIsEditingProfile(false);
+      }
+      setUploading(false);
+  };
+
   const handleCreateUser = async (userData) => {
       setUploading(true);
       const { email, password, fullName, role } = userData;
@@ -744,7 +894,11 @@ const VentureTracker = ({ supabase, isMock }) => {
       const { error: txError } = await supabase.from('transactions').delete().eq('team_id', teamId);
       if (txError) console.error("Error deleting transactions:", txError);
 
-      // 3. Delete Team
+      // 3. Delete Milestone Submissions
+      const { error: submissionsError } = await supabase.from('team_submissions').delete().eq('team_id', teamId);
+      if (submissionsError) console.error("Error deleting submissions:", submissionsError);
+
+      // 4. Delete Team
       const { error } = await supabase.from('teams').delete().eq('id', teamId);
       
       if (!error) {
@@ -803,6 +957,7 @@ const VentureTracker = ({ supabase, isMock }) => {
               </header>
               <AdminDashboard 
                   teams={allTeams} admins={adminList} profiles={profiles} settings={settings}
+                  cohortPhasesById={cohortPhasesById}
                   onUpdateSettings={handleUpdateSettings}
                   onUpdateProfile={handleUpdateProfile}
                   onAddAdmin={handleAddAdmin} onRemoveAdmin={handleRemoveAdmin}
@@ -866,49 +1021,40 @@ const VentureTracker = ({ supabase, isMock }) => {
             </div>
             <p className="text-xs text-neutral-500">Class of Spring 2026</p>
             </div>
-            <div className="p-4 space-y-2">
-            <button onClick={handleResetToMyTeam} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition ${view === 'dashboard' ? 'bg-yellow-900/20 text-yellow-500 font-bold' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
-                <Layout className="w-5 h-5" /> My Dashboard
-            </button>
-            <button onClick={() => setView('finances')} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition ${view === 'finances' ? 'bg-yellow-900/20 text-yellow-500 font-bold' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
-                <DollarSign className="w-5 h-5" /> Finances
-            </button>
-            <button onClick={() => setView('all-teams')} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition ${view === 'all-teams' ? 'bg-yellow-900/20 text-yellow-500 font-bold' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
-                <Users className="w-5 h-5" /> Class Directory
-            </button>
-            <button onClick={() => supabase.auth.signOut()} className="w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 text-neutral-400 hover:bg-neutral-900 hover:text-white transition">
-                <LogOut className="w-5 h-5" /> Sign Out
-            </button>
-            
-            <div className="mt-8 px-4">
+            <div className="p-4 space-y-6">
+              <div>
+                <p className="text-[10px] text-neutral-500 uppercase font-bold mb-2 px-2">Student</p>
+                <div className="space-y-2">
+                  <button onClick={handleResetToMyTeam} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition ${view === 'dashboard' ? 'bg-yellow-900/20 text-yellow-500 font-bold' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
+                      <Layout className="w-5 h-5" /> My Dashboard
+                  </button>
+                  <button onClick={() => setView('finances')} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition ${view === 'finances' ? 'bg-yellow-900/20 text-yellow-500 font-bold' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
+                      <DollarSign className="w-5 h-5" /> Finances
+                  </button>
+                  <button onClick={() => setView('all-teams')} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition ${view === 'all-teams' ? 'bg-yellow-900/20 text-yellow-500 font-bold' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
+                      <Users className="w-5 h-5" /> Class Directory
+                  </button>
+                </div>
+              </div>
+
+              {isAuthorizedAdmin && (
                 <div className="bg-neutral-900 p-3 rounded border border-neutral-800">
-                    <p className="text-[10px] text-neutral-500 uppercase font-bold mb-2">Admin Controls</p>
-                    {isAuthorizedAdmin ? (
-                        <>
-                            <button onClick={() => setView('admin-dashboard')} className={`w-full py-2 text-xs font-bold rounded flex items-center justify-center gap-2 transition mb-2 ${view === 'admin-dashboard' ? 'bg-yellow-900/20 text-yellow-500' : 'bg-neutral-800 text-neutral-400 hover:text-white'}`}>
-                                <Settings className="w-3 h-3" /> Admin Dashboard
-                            </button>
-                            <button onClick={() => setIsAdmin(!isAdmin)} className={`w-full py-2 text-xs font-bold rounded flex items-center justify-center gap-2 transition ${isAdmin ? 'bg-red-900/50 text-red-200' : 'bg-neutral-800 text-neutral-400'}`}>
-                                <Shield className="w-3 h-3" />
-                                {isAdmin ? 'Admin View Active' : 'Switch to Admin'}
-                            </button>
-                        </>
-                    ) : (
-                        <p className="text-xs text-neutral-600 italic text-center">Student Access Only</p>
-                    )}
+                  <p className="text-[10px] text-neutral-500 uppercase font-bold mb-2">Admin</p>
+                  <button onClick={() => setView('admin-dashboard')} className={`w-full py-2 text-xs font-bold rounded flex items-center justify-center gap-2 transition mb-2 ${view === 'admin-dashboard' ? 'bg-yellow-900/20 text-yellow-500' : 'bg-neutral-800 text-neutral-400 hover:text-white'}`}>
+                      <Settings className="w-3 h-3" /> Admin Dashboard
+                  </button>
+                  <button onClick={() => setIsAdmin(!isAdmin)} className={`w-full py-2 text-xs font-bold rounded flex items-center justify-center gap-2 transition ${isAdmin ? 'bg-red-900/50 text-red-200' : 'bg-neutral-800 text-neutral-400'}`}>
+                      <Shield className="w-3 h-3" />
+                      {isAdmin ? 'Admin View Active' : 'Switch to Admin'}
+                  </button>
                 </div>
+              )}
+
+              <button onClick={() => supabase.auth.signOut()} className="w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 text-neutral-400 hover:bg-neutral-900 hover:text-white transition">
+                  <LogOut className="w-5 h-5" /> Sign Out
+              </button>
             </div>
-            </div>
-            
-            <div className="p-4 mt-auto border-t border-neutral-800">
-                <div className="bg-gradient-to-br from-neutral-800 to-neutral-900 border border-yellow-600/30 rounded-lg p-4 text-white">
-                    <p className="text-xs opacity-80 uppercase tracking-wider mb-1 text-yellow-500">My Team</p>
-                    <h3 className="font-bold text-sm truncate">{myTeam.name}</h3>
-                    <button onClick={handleLeaveTeam} className="mt-2 text-xs text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors">
-                        <LogOut className="w-3 h-3" /> Leave Team
-                    </button>
-                </div>
-            </div>
+
         </aside>
 
         {/* Main */}
@@ -944,10 +1090,16 @@ const VentureTracker = ({ supabase, isMock }) => {
                     <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800 shadow-sm relative overflow-hidden">
                         <div className="flex justify-between items-start relative z-10">
                             <div className="flex items-center gap-4">
-                                <TeamLogo url={myTeam?.logo_url} name={myTeam?.name} className="w-16 h-16 rounded-lg" iconSize="w-8 h-8" />
+                                <TeamLogo url={myTeam?.logo_display_url || myTeam?.logo_url} name={myTeam?.name} className="w-16 h-16 rounded-lg" iconSize="w-8 h-8" />
                                 <div>
                                     <h2 className="text-xl font-bold text-white">{myTeam?.name}</h2>
                                     <p className="text-neutral-400 mt-1">{myTeam?.description}</p>
+                                    <button
+                                        onClick={() => setIsEditingProfile(true)}
+                                        className="mt-2 text-xs text-neutral-400 hover:text-white underline underline-offset-4"
+                                    >
+                                        Edit description and logo
+                                    </button>
                                 </div>
                             </div>
                             <div className="text-right">
@@ -1022,6 +1174,14 @@ const VentureTracker = ({ supabase, isMock }) => {
             </div>
         </main>
       </div>
+      {isEditingProfile && (
+        <TeamProfileModal
+          team={myTeam}
+          uploading={uploading}
+          onCancel={() => setIsEditingProfile(false)}
+          onSave={handleUpdateTeamProfile}
+        />
+      )}
     </div>
   );
 };

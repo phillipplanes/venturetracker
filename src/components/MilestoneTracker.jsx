@@ -43,15 +43,17 @@ const ReviewPanel = ({ teamId, taskId, currentStatus, submission, onReview }) =>
 
 const MilestoneTracker = ({ team, phases, onSubmitTask, onReviewTask, onUploadProof, uploading, isAdmin, readOnly = false }) => {
     // Create a map of submissions for easy lookup
-    const submissions = (team.team_submissions || []).reduce((acc, sub) => {
+    const submissionList = team.team_submissions || Object.entries(team.submissions || {}).map(([taskId, sub]) => ({ task_id: taskId, ...sub }));
+    const submissions = submissionList.reduce((acc, sub) => {
         acc[sub.task_id] = sub;
         return acc;
     }, {});
-    const taskEvidence = team.task_evidence || {}; 
+    const taskEvidence = team.task_evidence_display || team.task_evidence || {}; 
     const fileInputRef = useRef(null);
     const [activeTaskId, setActiveTaskId] = useState(null);
     const [expandedReview, setExpandedReview] = useState(null);
-    const [submissionTask, setSubmissionTask] = useState(null); 
+    const [submissionTask, setSubmissionTask] = useState(null);
+    const [isViewingSubmission, setIsViewingSubmission] = useState(false);
 
     const handleFileChange = (e) => {
       if (e.target.files && e.target.files[0] && activeTaskId) {
@@ -69,15 +71,32 @@ const MilestoneTracker = ({ team, phases, onSubmitTask, onReviewTask, onUploadPr
     
     return (
       <>
-        {!readOnly && submissionTask && (
+        {submissionTask && (
             <SubmissionModal 
                 task={submissionTask}
                 existingSummary={submissions[submissionTask.id]?.summary}
-                onSubmit={(summary) => {
-                    onSubmitTask(submissionTask.id, summary);
+                attachmentUrl={
+                    (() => {
+                        const proof = taskEvidence[submissionTask.id];
+                        return typeof proof === 'string' ? proof : proof?.url;
+                    })()
+                }
+                attachmentName={
+                    (() => {
+                        const proof = taskEvidence[submissionTask.id];
+                        return typeof proof === 'string' ? '' : proof?.name;
+                    })()
+                }
+                readOnly={isViewingSubmission}
+                onSubmit={(summary, file) => {
+                    onSubmitTask(submissionTask.id, summary, file);
                     setSubmissionTask(null);
+                    setIsViewingSubmission(false);
                 }}
-                onCancel={() => setSubmissionTask(null)}
+                onCancel={() => {
+                    setSubmissionTask(null);
+                    setIsViewingSubmission(false);
+                }}
             />
         )}
 
@@ -86,6 +105,7 @@ const MilestoneTracker = ({ team, phases, onSubmitTask, onReviewTask, onUploadPr
             type="file" 
             ref={fileInputRef} 
             className="hidden" 
+            accept="*/*"
             onChange={handleFileChange}
             />
             <div className="p-4 border-b border-neutral-800 bg-neutral-900 flex justify-between items-center">
@@ -120,6 +140,8 @@ const MilestoneTracker = ({ team, phases, onSubmitTask, onReviewTask, onUploadPr
                         const submission = submissions[task.id] || {};
                         const status = submission.status || 'incomplete';
                         const hasProof = taskEvidence[task.id];
+                        const proofUrl = typeof hasProof === 'string' ? hasProof : hasProof?.url;
+                        const proofName = typeof hasProof === 'string' ? '' : hasProof?.name;
 
                         let statusIcon = <Circle className="w-3.5 h-3.5 text-neutral-600" />;
                         let statusClass = "hover:bg-neutral-800";
@@ -147,11 +169,17 @@ const MilestoneTracker = ({ team, phases, onSubmitTask, onReviewTask, onUploadPr
                             <div className={`flex items-center justify-between gap-3 p-2 rounded-lg transition-colors border ${statusClass}`}>
                                 <div className={`flex items-start gap-3 flex-1 ${!readOnly ? 'cursor-pointer' : ''}`} onClick={() => {
                                     if (readOnly) return;
+                                    if (status === 'approved') {
+                                        setSubmissionTask(task);
+                                        setIsViewingSubmission(true);
+                                        return;
+                                    }
                                     if (isAdmin) {
                                         setExpandedReview(expandedReview === task.id ? null : task.id);
                                     } else {
                                         if (status === 'incomplete' || status === 'rejected') {
                                             setSubmissionTask(task);
+                                            setIsViewingSubmission(false);
                                         }
                                     }
                                 }}>
@@ -172,9 +200,9 @@ const MilestoneTracker = ({ team, phases, onSubmitTask, onReviewTask, onUploadPr
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                {!readOnly && hasProof && (
+                                {!readOnly && proofUrl && (
                                     <a 
-                                    href={hasProof} 
+                                    href={proofUrl} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
                                     className="text-blue-400 hover:text-blue-300 p-1" 
@@ -187,7 +215,7 @@ const MilestoneTracker = ({ team, phases, onSubmitTask, onReviewTask, onUploadPr
                                 {!readOnly && !isAdmin && status !== 'approved' && (
                                     <button 
                                         className={`${hasProof ? 'text-yellow-500' : 'text-neutral-500'} hover:text-yellow-500 p-1`}
-                                        title={hasProof ? "Replace Proof" : "Upload Evidence"}
+                                        title={hasProof ? "Replace Evidence (any file)" : "Upload Evidence (any file)"}
                                         disabled={uploading}
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -199,6 +227,11 @@ const MilestoneTracker = ({ team, phases, onSubmitTask, onReviewTask, onUploadPr
                                 )}
                                 </div>
                             </div>
+                            {!readOnly && proofName && (
+                                <div className="pl-8 pt-1 text-[10px] text-neutral-500 truncate">
+                                    Evidence: {proofName}
+                                </div>
+                            )}
                             
                             {!readOnly && isAdmin && (status === 'pending' || expandedReview === task.id) && (
                                 <ReviewPanel 

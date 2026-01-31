@@ -1,10 +1,28 @@
-import React, { useState, useRef } from 'react';
-import { MessageSquare, Camera, X } from 'lucide-react';
+import React, { useMemo, useRef, useState } from 'react';
+import { MessageSquare, Camera, X, Search, Image as ImageIcon, ArrowDownWideNarrow, ArrowUpWideNarrow } from 'lucide-react';
 
 const UpdateFeed = ({ updates, onPostUpdate, uploading, readOnly = false }) => {
   const [newUpdate, setNewUpdate] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
+  const [query, setQuery] = useState('');
+  const [withPhotosOnly, setWithPhotosOnly] = useState(false);
+  const [sortNewest, setSortNewest] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(6);
   const fileInputRef = useRef(null);
+
+  const filteredUpdates = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q
+      ? updates.filter((u) => (u.content || '').toLowerCase().includes(q))
+      : updates;
+    const photosFiltered = withPhotosOnly
+      ? list.filter((u) => u.image_display_url || u.image_url)
+      : list;
+    const sorted = [...photosFiltered].sort((a, b) =>
+      sortNewest ? new Date(b.created_at) - new Date(a.created_at) : new Date(a.created_at) - new Date(b.created_at)
+    );
+    return sorted;
+  }, [updates, query, withPhotosOnly, sortNewest]);
 
   const handleSubmit = () => {
     if (!newUpdate.trim()) return;
@@ -65,8 +83,48 @@ const UpdateFeed = ({ updates, onPostUpdate, uploading, readOnly = false }) => {
       </div>
       )}
 
+      <div className="bg-neutral-900 p-4 rounded-xl shadow-sm border border-neutral-800">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-neutral-300 flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-yellow-500" />
+            Weekly Updates
+          </h3>
+          <span className="text-xs text-neutral-500">{updates.length} total</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setVisibleCount(6);
+              }}
+              placeholder="Search updates..."
+              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg pl-9 pr-3 py-2 text-sm text-white outline-none focus:border-yellow-500"
+            />
+          </div>
+          <button
+            onClick={() => setWithPhotosOnly((v) => !v)}
+            className={`text-xs px-3 py-2 rounded-md font-medium border transition flex items-center gap-2 ${
+              withPhotosOnly ? 'bg-yellow-900/30 text-yellow-400 border-yellow-700/50' : 'bg-neutral-800 text-neutral-300 border-neutral-700 hover:bg-neutral-700'
+            }`}
+          >
+            <ImageIcon className="w-3.5 h-3.5" />
+            Photos
+          </button>
+          <button
+            onClick={() => setSortNewest(!sortNewest)}
+            className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-2 rounded-md font-medium border border-neutral-700 flex items-center gap-2"
+          >
+            {sortNewest ? <ArrowDownWideNarrow className="w-3.5 h-3.5" /> : <ArrowUpWideNarrow className="w-3.5 h-3.5" />}
+            {sortNewest ? 'Newest' : 'Oldest'}
+          </button>
+        </div>
+      </div>
+
       <div className="space-y-4">
-        {updates.length === 0 ? <div className="text-center py-8 text-neutral-600 text-sm">No updates available.</div> : updates.map((update) => (
+        {filteredUpdates.length === 0 ? <div className="text-center py-8 text-neutral-600 text-sm">No updates available.</div> : filteredUpdates.slice(0, visibleCount).map((update) => (
           <div key={update.id} className="bg-neutral-900 p-5 rounded-xl shadow-sm border border-neutral-800">
             <div className="flex justify-between items-start mb-2">
               <div className="flex items-center gap-2">
@@ -80,13 +138,21 @@ const UpdateFeed = ({ updates, onPostUpdate, uploading, readOnly = false }) => {
               </div>
             </div>
             <p className="text-neutral-300 text-sm whitespace-pre-wrap leading-relaxed mb-3">{update.content}</p>
-            {update.image_url && (
+            {(update.image_display_url || update.image_url) && (
               <div className="mt-2 rounded-lg overflow-hidden border border-neutral-800">
-                <img src={update.image_url} alt="Update attachment" className="w-full h-auto object-cover max-h-64" />
+                <img src={update.image_display_url || update.image_url} alt="Update attachment" className="w-full h-auto object-cover max-h-64" />
               </div>
             )}
           </div>
         ))}
+        {filteredUpdates.length > visibleCount && (
+          <button
+            onClick={() => setVisibleCount((c) => c + 6)}
+            className="w-full text-xs text-neutral-400 hover:text-white bg-neutral-900 border border-neutral-800 rounded-lg py-2"
+          >
+            Show more
+          </button>
+        )}
       </div>
     </div>
   );

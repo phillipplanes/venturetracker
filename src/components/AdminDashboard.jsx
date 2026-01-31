@@ -43,8 +43,8 @@ const ReviewPanel = ({ teamId, taskId, currentStatus, submission, onReview }) =>
     )
 }
 
-const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], settings, onUpdateSettings, onAddAdmin, onRemoveAdmin, onUpdateProfile, onViewTeam, onDeleteTeam, onCreateTeam, onUpdateTeam, onAssignCohort, onCreateUser, uploading }) => {
-    const [tab, setTab] = useState('cohorts');
+const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], settings, cohortPhasesById = {}, onUpdateSettings, onAddAdmin, onRemoveAdmin, onUpdateProfile, onViewTeam, onDeleteTeam, onCreateTeam, onUpdateTeam, onAssignCohort, onCreateUser, uploading }) => {
+    const [tab, setTab] = useState('overview');
     const [bannerMsg, setBannerMsg] = useState(settings?.banner_message || '');
     const [pitchDate, setPitchDate] = useState(settings?.pitch_date || '');
     const [newAdminEmail, setNewAdminEmail] = useState('');
@@ -54,6 +54,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     const [milestones, setMilestones] = useState([]);
     const [cohorts, setCohorts] = useState([]);
     const [newCohortName, setNewCohortName] = useState('');
+    const [newCohortStatus, setNewCohortStatus] = useState('active');
     const [selectedMilestoneCohort, setSelectedMilestoneCohort] = useState('');
     const [copying, setCopying] = useState(false);
     const [editingTeam, setEditingTeam] = useState(null);
@@ -178,12 +179,22 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
 
     const handleCreateCohort = async () => {
         if (!newCohortName.trim()) return;
-        const { error } = await supabase.from('cohorts').insert([{ name: newCohortName }]);
+        const { error } = await supabase.from('cohorts').insert([{ name: newCohortName, status: newCohortStatus }]);
         if (!error) {
             setNewCohortName('');
+            setNewCohortStatus('active');
             fetchCohorts();
         } else {
             alert("Failed to create cohort: " + error.message);
+        }
+    };
+
+    const handleUpdateCohortStatus = async (cohortId, status) => {
+        const { error } = await supabase.from('cohorts').update({ status }).eq('id', cohortId);
+        if (error) {
+            alert("Failed to update cohort status: " + error.message);
+        } else {
+            fetchCohorts();
         }
     };
 
@@ -196,7 +207,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
 
         try {
             // 1. Create new cohort
-            const { data: newCohortData, error: cohortError } = await supabase.from('cohorts').insert([{ name: newName }]).select().single();
+            const { data: newCohortData, error: cohortError } = await supabase.from('cohorts').insert([{ name: newName, status: sourceCohort.status || 'active' }]).select().single();
             if (cohortError) throw cohortError;
 
             // 2. Fetch phases and tasks from source cohort
@@ -282,14 +293,112 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             </div>
 
             {tab === 'overview' && (
-                <div className="grid md:grid-cols-3 gap-6">
-                    <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
-                        <h3 className="text-neutral-400 text-xs uppercase font-bold mb-2">Total Teams</h3>
-                        <p className="text-4xl font-bold text-white">{teams.length}</p>
+                <div className="space-y-6">
+                    <div className="grid md:grid-cols-3 gap-6">
+                        <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
+                            <h3 className="text-neutral-400 text-xs uppercase font-bold mb-2">Total Teams</h3>
+                            <p className="text-4xl font-bold text-white">{teams.length}</p>
+                        </div>
+                        <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
+                            <h3 className="text-neutral-400 text-xs uppercase font-bold mb-2">Total Students</h3>
+                            <p className="text-4xl font-bold text-white">{teams.reduce((acc, t) => acc + (t.members?.length || 0), 0)}</p>
+                        </div>
+                        <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
+                            <h3 className="text-neutral-400 text-xs uppercase font-bold mb-2">Pending Reviews</h3>
+                            <p className="text-4xl font-bold text-white">
+                                {teams.reduce((acc, t) => {
+                                    const subs = (t.team_submissions || []);
+                                    return acc + subs.filter(s => s.status === 'pending').length;
+                                }, 0)}
+                            </p>
+                        </div>
                     </div>
-                    <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
-                        <h3 className="text-neutral-400 text-xs uppercase font-bold mb-2">Total Students</h3>
-                        <p className="text-4xl font-bold text-white">{teams.reduce((acc, t) => acc + (t.members?.length || 0), 0)}</p>
+
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+                        <div className="p-4 border-b border-neutral-800 bg-neutral-950/50">
+                            <h3 className="font-bold text-white">Team Overview</h3>
+                            <p className="text-xs text-neutral-500 mt-1">Progress, pending approvals, and quick access.</p>
+                        </div>
+                        <div className="divide-y divide-neutral-800">
+                            {teams.map(team => {
+                                const phases = cohortPhasesById[team.cohort_id] || [];
+                                const totalTasks = phases.reduce((acc, p) => acc + p.tasks.length, 0);
+                                const submissions = (team.team_submissions || []).reduce((acc, sub) => {
+                                    acc[sub.task_id] = sub;
+                                    return acc;
+                                }, {});
+                                const approvedCount = Object.values(submissions).filter(s => s.status === 'approved').length;
+                                const pendingCount = Object.values(submissions).filter(s => s.status === 'pending').length;
+                                const progress = totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
+                                const pendingTasks = Object.values(submissions).filter(s => s.status === 'pending').slice(0, 3);
+                                const memberProfiles = (team.members || [])
+                                    .map(id => profiles.find(p => p.id === id))
+                                    .filter(Boolean);
+
+                                return (
+                                    <div key={team.id} className="p-4 hover:bg-neutral-800/40 transition">
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-4 min-w-0">
+                                                <TeamLogo url={team.logo_display_url || team.logo_url} name={team.name} className="w-12 h-12 rounded-lg" iconSize="w-5 h-5" />
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-3 flex-wrap">
+                                                        <h4 className="font-bold text-white truncate">{team.name}</h4>
+                                                        <span className="text-[10px] uppercase font-bold px-2 py-1 rounded-full bg-neutral-800 text-neutral-300 border border-neutral-700">
+                                                            {team.members?.length || 0} members
+                                                        </span>
+                                                        <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full border ${
+                                                            pendingCount > 0 ? 'bg-yellow-900/30 text-yellow-400 border-yellow-700/50' : 'bg-neutral-800 text-neutral-400 border-neutral-700'
+                                                        }`}>
+                                                            {pendingCount} pending approvals
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-sm text-neutral-400 line-clamp-1">{team.description || 'No description yet.'}</p>
+                                                    {memberProfiles.length > 0 && (
+                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                            {memberProfiles.slice(0, 6).map((m) => (
+                                                                <span key={m.id} className="text-[10px] text-neutral-300 bg-neutral-800 border border-neutral-700 px-2 py-1 rounded-full">
+                                                                    {m.email || m.full_name || m.id}
+                                                                </span>
+                                                            ))}
+                                                            {memberProfiles.length > 6 && (
+                                                                <span className="text-[10px] text-neutral-500">+{memberProfiles.length - 6} more</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {pendingTasks.length > 0 && (
+                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                            {pendingTasks.map((p, i) => (
+                                                                <span key={i} className="text-[10px] text-yellow-300 bg-yellow-900/20 border border-yellow-800/50 px-2 py-1 rounded-full">
+                                                                    {p.summary ? `${p.summary.slice(0, 48)}${p.summary.length > 48 ? '…' : ''}` : 'Pending task'}
+                                                                </span>
+                                                            ))}
+                                                            {pendingCount > 3 && (
+                                                                <span className="text-[10px] text-neutral-500">+{pendingCount - 3} more</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-right">
+                                                    <div className="text-2xl font-bold text-yellow-500">{progress}%</div>
+                                                    <p className="text-[10px] text-neutral-500">Complete</p>
+                                                </div>
+                                                <button onClick={() => onViewTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition">
+                                                    View
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 w-full bg-neutral-800 h-2 rounded-full overflow-hidden">
+                                            <div className="bg-yellow-500 h-full rounded-full" style={{ width: `${progress}%` }} />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            {teams.length === 0 && (
+                                <div className="p-8 text-center text-neutral-600 italic">No teams yet.</div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
@@ -305,7 +414,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                     {teams.map(team => (
                         <div key={team.id} className="bg-neutral-900 p-4 rounded-lg border border-neutral-800 flex justify-between items-center">
                             <div className="flex items-center gap-4">
-                                <TeamLogo url={team.logo_url} name={team.name} />
+                                <TeamLogo url={team.logo_display_url || team.logo_url} name={team.name} />
                                 <div>
                                     <h4 className="font-bold text-white">{team.name}</h4>
                                     <p className="text-xs text-neutral-500">{team.members?.length || 0} members</p>
@@ -341,16 +450,24 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             )}
 
             {tab === 'cohorts' && (
-                <div className="grid md:grid-cols-2 gap-8">
+                <div className="space-y-8">
                     <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
                         <h3 className="text-lg font-bold text-white mb-4">Create New Cohort</h3>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col md:flex-row gap-3">
                             <input 
                                 className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white outline-none focus:border-yellow-500"
                                 placeholder="e.g., Fall 2024"
                                 value={newCohortName}
                                 onChange={(e) => setNewCohortName(e.target.value)}
                             />
+                            <select
+                                value={newCohortStatus}
+                                onChange={(e) => setNewCohortStatus(e.target.value)}
+                                className="bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                            >
+                                <option value="active">Active</option>
+                                <option value="closed">Closed</option>
+                            </select>
                             <button onClick={handleCreateCohort} disabled={!newCohortName.trim() || uploading} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 disabled:opacity-50">
                                 Create
                             </button>
@@ -358,19 +475,34 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                     </div>
                     <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
                         <h3 className="text-lg font-bold text-white mb-4">Existing Cohorts</h3>
-                        <div className="space-y-2 max-h-64 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-neutral-700">
+                        <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-neutral-700">
                             {cohorts.length === 0 && <p className="text-sm text-neutral-500 italic">No cohorts created yet.</p>}
                             {cohorts.map(cohort => {
                                 const teamsInCohort = teams.filter(t => t.cohort_id === cohort.id);
                                 const canDelete = teamsInCohort.length === 0;
 
                                 return (
-                                    <div key={cohort.id} className="flex justify-between items-center bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                                    <div key={cohort.id} className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 bg-neutral-950 p-3 rounded-lg border border-neutral-800">
                                         <div>
                                             <p className="text-white font-medium">{cohort.name}</p>
-                                            <p className="text-xs text-neutral-500">{teamsInCohort.length} teams assigned</p>
+                                            <div className="flex items-center gap-3 mt-1">
+                                                <span className="text-xs text-neutral-500">{teamsInCohort.length} teams assigned</span>
+                                                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full border ${
+                                                    cohort.status === 'active' ? 'bg-green-900/30 text-green-400 border-green-700/50' : 'bg-neutral-800 text-neutral-400 border-neutral-700'
+                                                }`}>
+                                                    {cohort.status || 'active'}
+                                                </span>
+                                            </div>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            <select
+                                                value={cohort.status || 'active'}
+                                                onChange={(e) => handleUpdateCohortStatus(cohort.id, e.target.value)}
+                                                className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs rounded-md px-2 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                                            >
+                                                <option value="active">Active</option>
+                                                <option value="closed">Closed</option>
+                                            </select>
                                             <button 
                                                 onClick={() => {
                                                     if (window.confirm(`Are you sure you want to duplicate the '${cohort.name}' cohort and all its milestones?`)) {

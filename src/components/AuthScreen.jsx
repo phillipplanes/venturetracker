@@ -3,23 +3,23 @@ import { Rocket, ChevronRight } from 'lucide-react';
 
 const AuthScreen = ({ supabase, isMock }) => {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState('signin');
   const [loading, setLoading] = useState(false);
 
-  const handleMagicLink = async (e) => {
+  const handleEmailAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    const action = mode === 'signin'
+      ? supabase.auth.signInWithPassword({ email, password })
+      : supabase.auth.signUp({ email, password });
+    const { error } = await action;
     if (error) alert(error.message);
     setLoading(false);
   };
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    // Debugging: Log the exact URLs needed for configuration
-    console.log("--- Google OAuth Configuration Check ---");
-    console.log("1. Add this to Google Cloud Console > Authorized redirect URIs:");
-    console.log(`${supabase.supabaseUrl}/auth/v1/callback`);
-    console.log("----------------------------------------");
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -50,7 +50,7 @@ const AuthScreen = ({ supabase, isMock }) => {
         <h1 className="text-3xl font-bold text-white mb-2">VentureTracker</h1>
         <p className="text-neutral-400 mb-8">Launch your semester startup project.</p>
         
-        <form onSubmit={handleMagicLink} className="space-y-4">
+        <form onSubmit={handleEmailAuth} className="space-y-4">
           <input 
             type="email" 
             placeholder="Enter your student email"
@@ -59,18 +59,49 @@ const AuthScreen = ({ supabase, isMock }) => {
             className="w-full p-3 bg-neutral-950 border border-neutral-700 rounded-lg focus:ring-1 focus:ring-yellow-500 outline-none text-white text-center"
             required
           />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full p-3 bg-neutral-950 border border-neutral-700 rounded-lg focus:ring-1 focus:ring-yellow-500 outline-none text-white text-center"
+            required
+          />
           <button 
             type="submit"
             disabled={loading}
             className="w-full bg-yellow-600 text-black py-3 px-6 rounded-lg font-bold hover:bg-yellow-500 transition flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {loading ? 'Sending Link...' : 'Send Login Link'}
+            {loading ? 'Signing In...' : (mode === 'signin' ? 'Sign In' : 'Create Account')}
             {!loading && <ChevronRight className="w-4 h-4" />}
           </button>
         </form>
 
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            className="w-full bg-neutral-800 text-white py-3 px-6 rounded-lg font-semibold hover:bg-neutral-700 transition disabled:opacity-50"
+          >
+            Continue with Google
+          </button>
+        </div>
+
+        <div className="mt-4 text-xs text-neutral-500">
+          {mode === 'signin' ? (
+            <button type="button" className="hover:text-white" onClick={() => setMode('signup')}>
+              Need an account? Create one
+            </button>
+          ) : (
+            <button type="button" className="hover:text-white" onClick={() => setMode('signin')}>
+              Already have an account? Sign in
+            </button>
+          )}
+        </div>
+
         <p className="text-xs text-neutral-600 mt-6">
-          {isMock ? "Demo Mode: No Email Required" : "Powered by Supabase (PostgreSQL)"}
+          {isMock ? "Demo Mode: Any credentials work" : "Powered by Supabase (PostgreSQL)"}
         </p>
       </div>
     </div>

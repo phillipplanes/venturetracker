@@ -30,13 +30,15 @@ const CountdownBanner = ({ targetDate, message }) => {
   if (!targetDate && !message) return null;
 
   return (
-    <div className="bg-neutral-900 text-white px-4 py-2 flex justify-between items-center text-sm shadow-md z-20 relative border-b border-yellow-600/30">
-      <div className="flex items-center gap-2 font-medium text-yellow-500">
-        <Calendar className="w-4 h-4" />
-        <span className="text-white">{message || 'Class Announcements'}</span>
+    <div className="bg-gradient-to-r from-yellow-600/15 via-neutral-900 to-yellow-600/15 text-white px-4 py-3 flex flex-col md:flex-row md:justify-between md:items-center gap-2 text-sm shadow-lg z-20 relative border-b border-yellow-600/40">
+      <div className="flex items-center gap-2 font-semibold text-yellow-400">
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-yellow-500/20 border border-yellow-600/40">
+          <Calendar className="w-4 h-4" />
+        </span>
+        <span className="text-white tracking-wide">{message || 'Class Announcements'}</span>
       </div>
       {timeLeft && (
-        <div className="font-mono font-bold bg-neutral-800 px-3 py-1 rounded text-yellow-400 border border-yellow-600/30">
+        <div className="font-mono font-bold bg-neutral-950/70 px-4 py-2 rounded-full text-yellow-300 border border-yellow-600/40 shadow-[0_0_18px_rgba(234,179,8,0.25)]">
           {timeLeft}
         </div>
       )}

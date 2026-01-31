@@ -4,10 +4,12 @@ import TeamLogo from './TeamLogo';
 
 const TeamCard = ({ team, onClick, phasesByCohort }) => {
   // Logic updated to count Approved tasks only
-  const submissions = (team.team_submissions || []).reduce((acc, sub) => {
-      acc[sub.task_id] = sub;
-      return acc;
-  }, {});
+  const submissions = team.team_submissions
+    ? (team.team_submissions || []).reduce((acc, sub) => {
+        acc[sub.task_id] = sub;
+        return acc;
+      }, {})
+    : (team.submissions || {});
   const cohortPhases = phasesByCohort?.[team.cohort_id] || [];
   const totalTasks = cohortPhases.reduce((acc, p) => acc + p.tasks.length, 0);
   const approvedCount = Object.values(submissions).filter(s => s.status === 'approved').length;
@@ -20,7 +22,7 @@ const TeamCard = ({ team, onClick, phasesByCohort }) => {
     >
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-3 overflow-hidden">
-          <TeamLogo url={team.logo_url} name={team.name} />
+          <TeamLogo url={team.logo_display_url || team.logo_url} name={team.name} />
           <div className="min-w-0">
             <h3 className="font-bold text-lg text-white group-hover:text-yellow-500 transition truncate">
               {team.name}
