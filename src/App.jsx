@@ -335,6 +335,7 @@ const VentureTracker = ({ supabase, isMock }) => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // 1. Auth & Initial Load
   useEffect(() => {
@@ -1012,8 +1013,21 @@ const VentureTracker = ({ supabase, isMock }) => {
       )}
       <CountdownBanner targetDate={settings?.pitch_date} message={settings?.banner_message} />
       <div className="flex flex-1 overflow-hidden">
+        {/* Mobile Top Bar */}
+        <div className="md:hidden bg-neutral-950 border-b border-neutral-800 px-4 py-3 flex items-center justify-between sticky top-0 z-20 w-full">
+          <div className="flex items-center gap-2">
+            <Rocket className="w-5 h-5 text-yellow-500" />
+            <span className="font-bold text-white">VentureTracker</span>
+          </div>
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="text-sm text-neutral-300 border border-neutral-800 px-3 py-1.5 rounded-lg hover:bg-neutral-900"
+          >
+            Menu
+          </button>
+        </div>
         {/* Sidebar */}
-        <aside className="w-full md:w-64 bg-neutral-950 border-r border-neutral-800 flex-shrink-0 flex flex-col h-full">
+        <aside className={`md:w-64 bg-neutral-950 border-r border-neutral-800 flex-shrink-0 flex flex-col h-full md:static fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
             <div className="p-6 border-b border-neutral-800">
             <div className="flex items-center gap-2 mb-1">
                 <Rocket className="w-6 h-6 text-yellow-500" />
@@ -1025,13 +1039,13 @@ const VentureTracker = ({ supabase, isMock }) => {
               <div>
                 <p className="text-[10px] text-neutral-500 uppercase font-bold mb-2 px-2">Student</p>
                 <div className="space-y-2">
-                  <button onClick={handleResetToMyTeam} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition ${view === 'dashboard' ? 'bg-yellow-900/20 text-yellow-500 font-bold' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
+                  <button onClick={() => { setSidebarOpen(false); handleResetToMyTeam(); }} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition ${view === 'dashboard' ? 'bg-yellow-900/20 text-yellow-500 font-bold' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
                       <Layout className="w-5 h-5" /> My Dashboard
                   </button>
-                  <button onClick={() => setView('finances')} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition ${view === 'finances' ? 'bg-yellow-900/20 text-yellow-500 font-bold' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
+                  <button onClick={() => { setView('finances'); setSidebarOpen(false); }} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition ${view === 'finances' ? 'bg-yellow-900/20 text-yellow-500 font-bold' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
                       <DollarSign className="w-5 h-5" /> Finances
                   </button>
-                  <button onClick={() => setView('all-teams')} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition ${view === 'all-teams' ? 'bg-yellow-900/20 text-yellow-500 font-bold' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
+                  <button onClick={() => { setView('all-teams'); setSidebarOpen(false); }} className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition ${view === 'all-teams' ? 'bg-yellow-900/20 text-yellow-500 font-bold' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}>
                       <Users className="w-5 h-5" /> Class Directory
                   </button>
                 </div>
@@ -1040,7 +1054,7 @@ const VentureTracker = ({ supabase, isMock }) => {
               {isAuthorizedAdmin && (
                 <div className="bg-neutral-900 p-3 rounded border border-neutral-800">
                   <p className="text-[10px] text-neutral-500 uppercase font-bold mb-2">Admin</p>
-                  <button onClick={() => setView('admin-dashboard')} className={`w-full py-2 text-xs font-bold rounded flex items-center justify-center gap-2 transition mb-2 ${view === 'admin-dashboard' ? 'bg-yellow-900/20 text-yellow-500' : 'bg-neutral-800 text-neutral-400 hover:text-white'}`}>
+                  <button onClick={() => { setView('admin-dashboard'); setSidebarOpen(false); }} className={`w-full py-2 text-xs font-bold rounded flex items-center justify-center gap-2 transition mb-2 ${view === 'admin-dashboard' ? 'bg-yellow-900/20 text-yellow-500' : 'bg-neutral-800 text-neutral-400 hover:text-white'}`}>
                       <Settings className="w-3 h-3" /> Admin Dashboard
                   </button>
                   <button onClick={() => setIsAdmin(!isAdmin)} className={`w-full py-2 text-xs font-bold rounded flex items-center justify-center gap-2 transition ${isAdmin ? 'bg-red-900/50 text-red-200' : 'bg-neutral-800 text-neutral-400'}`}>
@@ -1050,12 +1064,19 @@ const VentureTracker = ({ supabase, isMock }) => {
                 </div>
               )}
 
-              <button onClick={() => supabase.auth.signOut()} className="w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 text-neutral-400 hover:bg-neutral-900 hover:text-white transition">
+              <button onClick={() => { setSidebarOpen(false); supabase.auth.signOut(); }} className="w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 text-neutral-400 hover:bg-neutral-900 hover:text-white transition">
                   <LogOut className="w-5 h-5" /> Sign Out
               </button>
             </div>
 
         </aside>
+
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/60 z-30 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
         {/* Main */}
         <main className="flex-1 overflow-y-auto bg-black">
