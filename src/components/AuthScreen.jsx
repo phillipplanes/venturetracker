@@ -20,10 +20,11 @@ const AuthScreen = ({ supabase, isMock }) => {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
+    const redirectBase = `${window.location.origin}${import.meta.env.BASE_URL || '/'}`;
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: redirectBase,
         queryParams: { access_type: 'offline', prompt: 'consent' }
       }
     });
