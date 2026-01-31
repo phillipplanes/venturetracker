@@ -979,7 +979,60 @@ const TeamLogo = ({ url, name, className = "w-10 h-10 rounded-md", iconSize = "w
     );
 };
 
-const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], settings, onUpdateSettings, onAddAdmin, onRemoveAdmin, onUpdateProfile, onViewTeam, onDeleteTeam, uploading }) => {
+const TeamEditModal = ({ team, onSave, onCancel, uploading }) => {
+    const [name, setName] = useState(team?.name || '');
+    const [description, setDescription] = useState(team?.description || '');
+    const isCreating = !team?.id;
+
+    const handleSave = () => {
+        onSave({ ...team, name, description });
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 w-full max-w-md shadow-2xl">
+                <h3 className="text-lg font-bold text-white mb-4">{isCreating ? 'Create New Team' : 'Edit Team'}</h3>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Team Name</label>
+                        <input
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-white outline-none focus:border-yellow-500"
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                            placeholder="Venture Name"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Description</label>
+                        <textarea
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded p-2 text-white outline-none focus:border-yellow-500 h-24 resize-none"
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            placeholder="A one-liner about the venture."
+                        />
+                    </div>
+                </div>
+                <div className="flex justify-end gap-3 mt-6">
+                    <button
+                        onClick={onCancel}
+                        className="px-4 py-2 text-neutral-400 hover:text-white text-sm"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={!name.trim() || uploading}
+                        className="bg-yellow-600 text-black px-4 py-2 rounded-lg text-sm font-bold hover:bg-yellow-500 disabled:opacity-50"
+                    >
+                        {uploading ? 'Saving...' : 'Save Changes'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], settings, onUpdateSettings, onAddAdmin, onRemoveAdmin, onUpdateProfile, onViewTeam, onDeleteTeam, onCreateTeam, onUpdateTeam, onAssignCohort, uploading }) => {
     const [tab, setTab] = useState('cohorts');
     const [bannerMsg, setBannerMsg] = useState(settings?.banner_message || '');
     const [pitchDate, setPitchDate] = useState(settings?.pitch_date || '');
@@ -992,6 +1045,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     const [newCohortName, setNewCohortName] = useState('');
     const [selectedMilestoneCohort, setSelectedMilestoneCohort] = useState('');
     const [copying, setCopying] = useState(false);
+    const [editingTeam, setEditingTeam] = useState(null);
 
     useEffect(() => {
         if (settings) {
@@ -1136,12 +1190,12 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
 
             // 3. Create new phases and tasks
             for (const phase of sourcePhases) {
-                const { tasks, ...phaseDetails } = phase;
-                const { data: newPhaseData, error: newPhaseError } = await supabase.from('milestone_phases').insert([{ ...phaseDetails, cohort_id: newCohortData.id, id: undefined, created_at: undefined }]).select().single();
+                const { tasks, id, created_at, ...phaseDetails } = phase;
+                const { data: newPhaseData, error: newPhaseError } = await supabase.from('milestone_phases').insert([{ ...phaseDetails, cohort_id: newCohortData.id }]).select().single();
                 if (newPhaseError) throw newPhaseError;
 
                 if (tasks && tasks.length > 0) {
-                    const newTasks = tasks.map(t => ({ ...t, phase_id: newPhaseData.id, id: undefined, created_at: undefined }));
+                    const newTasks = tasks.map(({ id, created_at, ...t }) => ({ ...t, phase_id: newPhaseData.id }));
                     const { error: newTasksError } = await supabase.from('milestone_tasks').insert(newTasks);
                     if (newTasksError) throw newTasksError;
                 }
@@ -1164,12 +1218,12 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
 
             // 2. Create new phases and tasks for the target cohort
             for (const phase of sourcePhases) {
-                const { tasks, ...phaseDetails } = phase;
-                const { data: newPhaseData, error: newPhaseError } = await supabase.from('milestone_phases').insert([{ ...phaseDetails, cohort_id: selectedMilestoneCohort, id: undefined, created_at: undefined }]).select().single();
+                const { tasks, id, created_at, ...phaseDetails } = phase;
+                const { data: newPhaseData, error: newPhaseError } = await supabase.from('milestone_phases').insert([{ ...phaseDetails, cohort_id: selectedMilestoneCohort }]).select().single();
                 if (newPhaseError) throw newPhaseError;
 
                 if (tasks && tasks.length > 0) {
-                    const newTasks = tasks.map(t => ({ ...t, phase_id: newPhaseData.id, id: undefined, created_at: undefined }));
+                    const newTasks = tasks.map(({ id, created_at, ...t }) => ({ ...t, phase_id: newPhaseData.id }));
                     const { error: newTasksError } = await supabase.from('milestone_tasks').insert(newTasks);
                     if (newTasksError) throw newTasksError;
                 }
@@ -1227,6 +1281,12 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
 
             {tab === 'teams' && (
                 <div className="space-y-4">
+                    <div className="flex justify-end">
+                        <button onClick={() => setEditingTeam({ name: '', description: '' })} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 text-sm flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Create New Team
+                        </button>
+                    </div>
                     {teams.map(team => (
                         <div key={team.id} className="bg-neutral-900 p-4 rounded-lg border border-neutral-800 flex justify-between items-center">
                             <div className="flex items-center gap-4">
@@ -1239,7 +1299,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                             <div className="flex items-center gap-2">
                                 <select
                                     value={team.cohort_id || ''}
-                                    onChange={(e) => handleAssignCohort(team.id, e.target.value)}
+                                    onChange={(e) => onAssignCohort(team.id, e.target.value)}
                                     className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs rounded-md px-2 py-2 focus:ring-yellow-500 focus:border-yellow-500"
                                 >
                                     <option value="">Assign Cohort...</option>
@@ -1247,6 +1307,9 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                         <option key={c.id} value={c.id}>{c.name}</option>
                                     ))}
                                 </select>
+                                <button onClick={() => setEditingTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition flex items-center gap-1">
+                                    <Edit2 className="w-3 h-3" /> Edit
+                                </button>
                                 <button onClick={() => onViewTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition">
                                     View Dashboard
                                 </button>
@@ -1484,6 +1547,22 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                         <button onClick={saveSettings} disabled={uploading} className="bg-yellow-600 text-black font-bold px-6 py-2 rounded-lg hover:bg-yellow-500 disabled:opacity-50">{uploading ? 'Saving...' : 'Save Settings'}</button>
                     </div>
                 </div>
+            )}
+
+            {editingTeam && (
+                <TeamEditModal
+                    team={editingTeam}
+                    uploading={uploading}
+                    onCancel={() => setEditingTeam(null)}
+                    onSave={(teamData) => {
+                        if (teamData.id) {
+                            onUpdateTeam(teamData);
+                        } else {
+                            onCreateTeam(teamData);
+                        }
+                        setEditingTeam(null);
+                    }}
+                />
             )}
 
             {teamToDelete && (
@@ -2124,6 +2203,37 @@ const VentureTracker = ({ supabase, isMock }) => {
     if (!error) fetchTeams();
   };
 
+  const handleAssignCohort = async (teamId, cohortId) => {
+    const newCohortId = cohortId === '' ? null : cohortId;
+    const { error } = await supabase
+        .from('teams')
+        .update({ cohort_id: newCohortId })
+        .eq('id', teamId);
+    if (error) {
+        alert('Failed to assign cohort: ' + error.message);
+    } // The realtime subscription will trigger fetchTeams() on success
+  };
+
+  const handleAdminCreateTeam = async (teamData) => {
+    setUploading(true);
+    const { error } = await supabase.from('teams').insert([{
+        name: teamData.name,
+        description: teamData.description,
+        members: [],
+        submissions: {},
+        task_evidence: {}
+    }]);
+    if (!error) fetchTeams();
+    setUploading(false);
+  };
+
+  const handleAdminUpdateTeam = async (teamData) => {
+    setUploading(true);
+    const { error } = await supabase.from('teams').update({ name: teamData.name, description: teamData.description }).eq('id', teamData.id);
+    if (!error) fetchTeams();
+    setUploading(false);
+  };
+
   const handleLeaveTeam = async () => {
     if (!myTeam) return;
     if (!window.confirm("Are you sure you want to leave your team?")) return;
@@ -2209,32 +2319,16 @@ const VentureTracker = ({ supabase, isMock }) => {
 
   const handleUpdateSettings = async (newSettings) => {
       setUploading(true);
-      // Destructure to remove milestones from the object before saving to the 'settings' table.
-      const { milestones, ...settingsToSave } = newSettings;
-      const query = supabase.from('settings');
-      
-      let opError;
-      if (settingsToSave.id) {
-          const { error } = await query.update(settingsToSave).eq('id', settingsToSave.id);
-          opError = error;
-      } else {
-          const { error } = await query.insert([settingsToSave]);
-          opError = error;
-      }
-      
-      if (!opError) {
-          // Re-fetch: If we have ID, use it. If not, get the latest created.
-          let fetchQuery = supabase.from('settings').select('*');
-          if (settingsToSave.id) {
-              fetchQuery = fetchQuery.eq('id', settingsToSave.id).single();
-          } else {
-              fetchQuery = fetchQuery.order('created_at', { ascending: false }).limit(1).single();
-          }
-          const { data } = await fetchQuery;
+      const { data, error } = await supabase.rpc('upsert_settings', {
+        settings_data: newSettings
+      }).single();
+
+
+      if (!error && data) {
           if (data) setSettings(data);
       } else {
-          console.error("Error updating settings:", opError);
-          alert("Failed to save settings");
+          console.error("Error updating settings:", error);
+          alert("Failed to save settings. Check the console for details.");
       }
       setUploading(false);
   };
@@ -2339,6 +2433,9 @@ const VentureTracker = ({ supabase, isMock }) => {
                   onAddAdmin={handleAddAdmin} onRemoveAdmin={handleRemoveAdmin}
                   onViewTeam={handleAdminViewTeam} onDeleteTeam={handleDeleteTeam}
                   uploading={uploading}
+                  onCreateTeam={handleAdminCreateTeam}
+                  onUpdateTeam={handleAdminUpdateTeam}
+                  onAssignCohort={handleAssignCohort}
                   supabase={supabase}
               />
           </div>
