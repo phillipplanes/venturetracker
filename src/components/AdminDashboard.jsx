@@ -64,6 +64,10 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     const [isCreatingUser, setIsCreatingUser] = useState(false);
     const [bannerStatus, setBannerStatus] = useState({});
     const [dateStatus, setDateStatus] = useState({});
+    const [teamSearch, setTeamSearch] = useState('');
+    const [teamSort, setTeamSort] = useState('newest');
+    const [teamCohortFilter, setTeamCohortFilter] = useState('');
+    const [dragTask, setDragTask] = useState(null);
     const adminCardClass = "w-full";
 
     const toLocalInputValue = (value) => {
@@ -143,6 +147,38 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
         // We could add a "saving..." indicator here in the future.
     };
 
+    const persistTaskOrder = async (phaseIndex, tasks) => {
+        if (!tasks || tasks.length === 0) return;
+        try {
+            await Promise.all(
+                tasks.map((task, index) =>
+                    supabase
+                        .from('milestone_tasks')
+                        .update({ order: index })
+                        .eq('id', task.id)
+                )
+            );
+            const next = [...milestones];
+            next[phaseIndex].tasks = tasks;
+            setMilestones(next);
+        } catch (error) {
+            console.error('Failed to update task order:', error);
+        }
+    };
+
+    const handleTaskDrop = async (phaseIndex, targetIndex) => {
+        if (!dragTask || dragTask.phaseIndex !== phaseIndex) return;
+        const sourceIndex = dragTask.taskIndex;
+        if (sourceIndex === targetIndex) return;
+        const next = [...milestones];
+        const tasks = [...next[phaseIndex].tasks];
+        const [moved] = tasks.splice(sourceIndex, 1);
+        tasks.splice(targetIndex, 0, moved);
+        next[phaseIndex].tasks = tasks;
+        setMilestones(next);
+        setDragTask(null);
+        await persistTaskOrder(phaseIndex, tasks);
+    };
 
     const addPhase = async () => {
         if (!selectedMilestoneCohort) return;
@@ -444,47 +480,114 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
 
             {tab === 'teams' && (
                 <div className="space-y-4 w-full">
-                        <div className="flex justify-end">
-                            <button onClick={() => setEditingTeam({ name: '', description: '' })} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 text-sm flex items-center gap-2">
-                                <Plus className="w-4 h-4" />
-                                Create New Team
-                            </button>
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                            <input
+                                value={teamSearch}
+                                onChange={(e) => setTeamSearch(e.target.value)}
+                                placeholder="Search teams..."
+                                className="w-full sm:w-64 bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-2 text-white text-sm focus:border-yellow-500 outline-none"
+                            />
+                            <select
+                                value={teamCohortFilter}
+                                onChange={(e) => setTeamCohortFilter(e.target.value)}
+                                className="bg-neutral-900 border border-neutral-800 text-neutral-300 rounded-lg px-3 py-2 text-sm focus:border-yellow-500 outline-none"
+                            >
+                                <option value="">All Cohorts</option>
+                                {cohorts.map((cohort) => (
+                                    <option key={cohort.id} value={cohort.id}>{cohort.name}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={teamSort}
+                                onChange={(e) => setTeamSort(e.target.value)}
+                                className="bg-neutral-900 border border-neutral-800 text-neutral-300 rounded-lg px-3 py-2 text-sm focus:border-yellow-500 outline-none"
+                            >
+                                <option value="newest">Newest</option>
+                                <option value="oldest">Oldest</option>
+                                <option value="name-asc">Name A–Z</option>
+                                <option value="name-desc">Name Z–A</option>
+                                <option value="members-desc">Most Members</option>
+                            </select>
                         </div>
-                        {teams.map(team => (
-                        <div key={team.id} className="bg-neutral-900 p-4 rounded-lg border border-neutral-800 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-                            <div className="flex items-center gap-4">
-                                <TeamLogo url={team.logo_display_url || team.logo_url} name={team.name} />
-                                <div>
-                                    <h4 className="font-bold text-white">{team.name}</h4>
-                                    <p className="text-xs text-neutral-500">{team.members?.length || 0} members</p>
-                                </div>
+                        <button onClick={() => setEditingTeam({ name: '', description: '' })} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 text-sm flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Create New Team
+                        </button>
+                    </div>
+                    {(() => {
+                        const filtered = teams.filter(t => {
+                            const q = teamSearch.trim().toLowerCase();
+                            if (teamCohortFilter && t.cohort_id !== teamCohortFilter) {
+                                return false;
+                            }
+                            if (!q) return true;
+                            return (t.name || '').toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q);
+                        });
+                        const sorted = [...filtered].sort((a, b) => {
+                            if (teamSort === 'name-asc') return (a.name || '').localeCompare(b.name || '');
+                            if (teamSort === 'name-desc') return (b.name || '').localeCompare(a.name || '');
+                            if (teamSort === 'members-desc') return (b.members?.length || 0) - (a.members?.length || 0);
+                            if (teamSort === 'oldest') return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+                            return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+                        });
+                        return (
+                            <div className="space-y-4">
+                                {sorted.map(team => {
+                                    const memberProfiles = (team.members || [])
+                                        .map(id => profiles.find(p => p.id === id))
+                                        .filter(Boolean);
+                                    return (
+                                        <div key={team.id} className="bg-neutral-900 p-4 rounded-lg border border-neutral-800 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+                                            <div className="flex items-start gap-4 min-w-0">
+                                                <TeamLogo url={team.logo_display_url || team.logo_url} name={team.name} />
+                                                <div className="min-w-0">
+                                                    <h4 className="font-bold text-white">{team.name}</h4>
+                                                    <p className="text-xs text-neutral-500 line-clamp-2">{team.description || 'No description'}</p>
+                                                    <div className="mt-2 flex flex-wrap gap-1">
+                                                        {memberProfiles.length > 0 ? memberProfiles.map(m => (
+                                                            <span key={m.id} className="px-2 py-0.5 bg-neutral-800 rounded text-xs text-neutral-300 border border-neutral-700">
+                                                                {m.email || m.full_name || m.id}
+                                                            </span>
+                                                        )) : (
+                                                            <span className="text-neutral-600 italic text-xs">No members</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <select
+                                                    value={team.cohort_id || ''}
+                                                    onChange={(e) => onAssignCohort(team.id, e.target.value)}
+                                                    className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs rounded-md px-2 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                                                >
+                                                    <option value="">Assign Cohort...</option>
+                                                    {cohorts.map(c => (
+                                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                                    ))}
+                                                </select>
+                                                <button onClick={() => setEditingTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition flex items-center gap-1">
+                                                    <Edit2 className="w-3 h-3" /> Edit
+                                                </button>
+                                                <button onClick={() => onViewTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition">
+                                                    View Dashboard
+                                                </button>
+                                                <button 
+                                                    onClick={() => setTeamToDelete(team)} 
+                                                    className="text-xs bg-red-900/20 hover:bg-red-900/40 text-red-400 px-3 py-2 rounded-md border border-red-900/30 transition flex items-center gap-1"
+                                                >
+                                                    <Trash2 className="w-3 h-3" /> Delete
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {sorted.length === 0 && (
+                                    <div className="text-center text-neutral-600 italic">No teams found.</div>
+                                )}
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <select
-                                    value={team.cohort_id || ''}
-                                    onChange={(e) => onAssignCohort(team.id, e.target.value)}
-                                    className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs rounded-md px-2 py-2 focus:ring-yellow-500 focus:border-yellow-500"
-                                >
-                                    <option value="">Assign Cohort...</option>
-                                    {cohorts.map(c => (
-                                        <option key={c.id} value={c.id}>{c.name}</option>
-                                    ))}
-                                </select>
-                                <button onClick={() => setEditingTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition flex items-center gap-1">
-                                    <Edit2 className="w-3 h-3" /> Edit
-                                </button>
-                                <button onClick={() => onViewTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition">
-                                    View Dashboard
-                                </button>
-                                <button 
-                                    onClick={() => setTeamToDelete(team)} 
-                                    className="text-xs bg-red-900/20 hover:bg-red-900/40 text-red-400 px-3 py-2 rounded-md border border-red-900/30 transition flex items-center gap-1"
-                                >
-                                    <Trash2 className="w-3 h-3" /> Delete
-                                </button>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })()}
                 </div>
             )}
 
@@ -512,18 +615,21 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                 value={newCohortStart}
                                 onChange={(e) => setNewCohortStart(e.target.value)}
                                 className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                                aria-label="Start date"
                             />
                             <input
                                 type="date"
                                 value={newCohortEnd}
                                 onChange={(e) => setNewCohortEnd(e.target.value)}
                                 className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                                aria-label="End date"
                             />
                             <input
                                 type="date"
                                 value={newCohortPitchDate}
                                 onChange={(e) => setNewCohortPitchDate(e.target.value)}
                                 className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                                aria-label="Pitch date"
                             />
                             <button onClick={handleCreateCohort} disabled={!newCohortName.trim() || uploading} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 disabled:opacity-50">
                                 Create
@@ -623,56 +729,67 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                           )}
                                         </div>
                                         <div className="mt-2">
-                                          <label className="block text-[10px] text-neutral-500 uppercase mb-1">Cohort Dates</label>
-                                          <div className="flex flex-col md:flex-row gap-2">
-                                            <input
-                                              type="date"
-                                              value={cohort.start_date || ''}
-                                              onChange={(e) => {
-                                                const next = e.target.value;
-                                                setCohorts(prev => prev.map(c => c.id === cohort.id ? { ...c, start_date: next } : c));
-                                                setDateStatus(prev => ({ ...prev, [cohort.id]: '' }));
-                                              }}
-                                              className="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-xs text-neutral-200 outline-none focus:border-yellow-500"
-                                            />
-                                            <input
-                                              type="date"
-                                              value={cohort.end_date || ''}
-                                              onChange={(e) => {
-                                                const next = e.target.value;
-                                                setCohorts(prev => prev.map(c => c.id === cohort.id ? { ...c, end_date: next } : c));
-                                                setDateStatus(prev => ({ ...prev, [cohort.id]: '' }));
-                                              }}
-                                              className="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-xs text-neutral-200 outline-none focus:border-yellow-500"
-                                            />
-                                            <input
-                                              type="date"
-                                              value={cohort.pitch_date || ''}
-                                              onChange={(e) => {
-                                                const next = e.target.value;
-                                                setCohorts(prev => prev.map(c => c.id === cohort.id ? { ...c, pitch_date: next } : c));
-                                                setDateStatus(prev => ({ ...prev, [cohort.id]: '' }));
-                                              }}
-                                              className="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-xs text-neutral-200 outline-none focus:border-yellow-500"
-                                            />
-                                            <button
-                                              onClick={async () => {
-                                                setDateStatus(prev => ({ ...prev, [cohort.id]: 'saving' }));
-                                                const { error } = await supabase.from('cohorts').update({
-                                                  start_date: cohort.start_date || null,
-                                                  end_date: cohort.end_date || null,
-                                                  pitch_date: cohort.pitch_date || null
-                                                }).eq('id', cohort.id);
-                                                if (error) {
-                                                  setDateStatus(prev => ({ ...prev, [cohort.id]: 'error' }));
-                                                } else {
-                                                  setDateStatus(prev => ({ ...prev, [cohort.id]: 'saved' }));
-                                                }
-                                              }}
-                                              className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs px-3 py-2 rounded-md border border-neutral-700"
-                                            >
-                                              Save Dates
-                                            </button>
+                                          <label className="block text-[10px] text-neutral-500 uppercase mb-2">Cohort Dates</label>
+                                          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                                            <div>
+                                              <label className="block text-[10px] text-neutral-500 mb-1">Start Date</label>
+                                              <input
+                                                type="date"
+                                                value={cohort.start_date || ''}
+                                                onChange={(e) => {
+                                                  const next = e.target.value;
+                                                  setCohorts(prev => prev.map(c => c.id === cohort.id ? { ...c, start_date: next } : c));
+                                                  setDateStatus(prev => ({ ...prev, [cohort.id]: '' }));
+                                                }}
+                                                className="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-xs text-neutral-200 outline-none focus:border-yellow-500"
+                                              />
+                                            </div>
+                                            <div>
+                                              <label className="block text-[10px] text-neutral-500 mb-1">End Date</label>
+                                              <input
+                                                type="date"
+                                                value={cohort.end_date || ''}
+                                                onChange={(e) => {
+                                                  const next = e.target.value;
+                                                  setCohorts(prev => prev.map(c => c.id === cohort.id ? { ...c, end_date: next } : c));
+                                                  setDateStatus(prev => ({ ...prev, [cohort.id]: '' }));
+                                                }}
+                                                className="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-xs text-neutral-200 outline-none focus:border-yellow-500"
+                                              />
+                                            </div>
+                                            <div>
+                                              <label className="block text-[10px] text-neutral-500 mb-1">Pitch Date</label>
+                                              <input
+                                                type="date"
+                                                value={cohort.pitch_date || ''}
+                                                onChange={(e) => {
+                                                  const next = e.target.value;
+                                                  setCohorts(prev => prev.map(c => c.id === cohort.id ? { ...c, pitch_date: next } : c));
+                                                  setDateStatus(prev => ({ ...prev, [cohort.id]: '' }));
+                                                }}
+                                                className="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-xs text-neutral-200 outline-none focus:border-yellow-500"
+                                              />
+                                            </div>
+                                            <div className="flex items-end">
+                                              <button
+                                                onClick={async () => {
+                                                  setDateStatus(prev => ({ ...prev, [cohort.id]: 'saving' }));
+                                                  const { error } = await supabase.from('cohorts').update({
+                                                    start_date: cohort.start_date || null,
+                                                    end_date: cohort.end_date || null,
+                                                    pitch_date: cohort.pitch_date || null
+                                                  }).eq('id', cohort.id);
+                                                  if (error) {
+                                                    setDateStatus(prev => ({ ...prev, [cohort.id]: 'error' }));
+                                                  } else {
+                                                    setDateStatus(prev => ({ ...prev, [cohort.id]: 'saved' }));
+                                                  }
+                                                }}
+                                                className="w-full bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs px-3 py-2 rounded-md border border-neutral-700"
+                                              >
+                                                Save Dates
+                                              </button>
+                                            </div>
                                           </div>
                                           {dateStatus[cohort.id] === 'saved' && (
                                             <p className="text-[10px] text-green-400 mt-1">Dates saved</p>
@@ -868,7 +985,16 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                         </div>
                                         <div className="space-y-2 mt-4">
                                             {phase.tasks.map((task, taskIndex) => (
-                                                <div key={task.id} className="flex items-center gap-2">
+                                                <div
+                                                    key={task.id}
+                                                    className={`flex items-center gap-2 ${dragTask && dragTask.phaseIndex === phaseIndex && dragTask.taskIndex === taskIndex ? 'opacity-60' : ''}`}
+                                                    draggable
+                                                    onDragStart={() => setDragTask({ phaseIndex, taskIndex })}
+                                                    onDragEnd={() => setDragTask(null)}
+                                                    onDragOver={(e) => e.preventDefault()}
+                                                    onDrop={() => handleTaskDrop(phaseIndex, taskIndex)}
+                                                >
+                                                    <div className="text-neutral-600 cursor-grab select-none px-1" title="Drag to reorder">⋮⋮</div>
                                                     <input 
                                                         className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-sm text-white outline-none focus:border-yellow-500"
                                                         value={task.label}
