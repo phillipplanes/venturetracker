@@ -277,15 +277,29 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
         p.email.toLowerCase().includes(userSearch.toLowerCase())
     );
 
+    const tabs = ['overview', 'teams', 'users', 'cohorts', 'milestones', 'settings'];
+
     return (
-        <div className="p-8 max-w-6xl mx-auto">
+        <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto overflow-x-hidden">
             <h1 className="text-3xl font-bold text-white mb-8 flex items-center gap-3">
                 <Shield className="w-8 h-8 text-yellow-500" />
                 Admin Dashboard
             </h1>
 
-            <div className="flex gap-4 border-b border-neutral-800 mb-8 overflow-x-auto">
-                {['overview', 'teams', 'users', 'cohorts', 'milestones', 'settings'].map(t => (
+            {/* Mobile tab selector */}
+            <div className="md:hidden mb-6">
+                <label className="block text-xs font-bold text-neutral-500 uppercase mb-2">Section</label>
+                <select
+                    value={tab}
+                    onChange={(e) => setTab(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white outline-none focus:border-yellow-500"
+                >
+                    {tabs.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+            </div>
+
+            <div className="hidden md:flex gap-4 border-b border-neutral-800 mb-8 overflow-x-auto">
+                {tabs.map(t => (
                     <button key={t} onClick={() => setTab(t)} className={`pb-3 px-2 text-sm font-bold uppercase tracking-wider transition whitespace-nowrap ${tab === t ? 'text-yellow-500 border-b-2 border-yellow-500' : 'text-neutral-500 hover:text-white'}`}>
                         {t}
                     </button>
