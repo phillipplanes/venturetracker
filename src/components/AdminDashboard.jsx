@@ -294,18 +294,27 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
 
             {tab === 'overview' && (
                 <div className="space-y-6">
-                    <div className="grid md:grid-cols-3 gap-6">
-                        <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
-                            <h3 className="text-neutral-400 text-xs uppercase font-bold mb-2">Total Teams</h3>
-                            <p className="text-4xl font-bold text-white">{teams.length}</p>
+                    <div className="grid grid-cols-3 gap-3 md:gap-6">
+                        <div className="bg-neutral-900 p-4 md:p-6 rounded-xl border border-neutral-800">
+                            <h3 className="text-neutral-400 text-[10px] md:text-xs uppercase font-bold mb-2">
+                                <span className="md:hidden">Teams</span>
+                                <span className="hidden md:inline">Total Teams</span>
+                            </h3>
+                            <p className="text-2xl md:text-4xl font-bold text-white">{teams.length}</p>
                         </div>
-                        <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
-                            <h3 className="text-neutral-400 text-xs uppercase font-bold mb-2">Total Students</h3>
-                            <p className="text-4xl font-bold text-white">{teams.reduce((acc, t) => acc + (t.members?.length || 0), 0)}</p>
+                        <div className="bg-neutral-900 p-4 md:p-6 rounded-xl border border-neutral-800">
+                            <h3 className="text-neutral-400 text-[10px] md:text-xs uppercase font-bold mb-2">
+                                <span className="md:hidden">Students</span>
+                                <span className="hidden md:inline">Total Students</span>
+                            </h3>
+                            <p className="text-2xl md:text-4xl font-bold text-white">{teams.reduce((acc, t) => acc + (t.members?.length || 0), 0)}</p>
                         </div>
-                        <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
-                            <h3 className="text-neutral-400 text-xs uppercase font-bold mb-2">Pending Reviews</h3>
-                            <p className="text-4xl font-bold text-white">
+                        <div className="bg-neutral-900 p-4 md:p-6 rounded-xl border border-neutral-800">
+                            <h3 className="text-neutral-400 text-[10px] md:text-xs uppercase font-bold mb-2">
+                                <span className="md:hidden">Pending</span>
+                                <span className="hidden md:inline">Pending Reviews</span>
+                            </h3>
+                            <p className="text-2xl md:text-4xl font-bold text-white">
                                 {teams.reduce((acc, t) => {
                                     const subs = (t.team_submissions || []);
                                     return acc + subs.filter(s => s.status === 'pending').length;
@@ -454,9 +463,9 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                 <div className="space-y-8">
                     <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
                         <h3 className="text-lg font-bold text-white mb-4">Create New Cohort</h3>
-                        <div className="flex flex-col md:flex-row gap-3">
+                        <div className="grid md:grid-cols-4 gap-3">
                             <input 
-                                className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white outline-none focus:border-yellow-500"
+                                className="w-full md:col-span-1 bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white outline-none focus:border-yellow-500"
                                 placeholder="e.g., Fall 2024"
                                 value={newCohortName}
                                 onChange={(e) => setNewCohortName(e.target.value)}
@@ -464,7 +473,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                             <select
                                 value={newCohortStatus}
                                 onChange={(e) => setNewCohortStatus(e.target.value)}
-                                className="bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                                className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
                             >
                                 <option value="active">Active</option>
                                 <option value="closed">Closed</option>
@@ -483,8 +492,9 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                 const canDelete = teamsInCohort.length === 0;
 
                                 return (
-                                    <div key={cohort.id} className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 bg-neutral-950 p-3 rounded-lg border border-neutral-800">
-                                        <div>
+                                    <div key={cohort.id} className="flex flex-col gap-3 bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                                        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+                                          <div>
                                             <p className="text-white font-medium">{cohort.name}</p>
                                             <div className="flex items-center gap-3 mt-1">
                                                 <span className="text-xs text-neutral-500">{teamsInCohort.length} teams assigned</span>
@@ -494,8 +504,8 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                                     {cohort.status || 'active'}
                                                 </span>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
+                                          </div>
+                                          <div className="flex items-center gap-2">
                                             <select
                                                 value={cohort.status || 'active'}
                                                 onChange={(e) => handleUpdateCohortStatus(cohort.id, e.target.value)}
@@ -527,6 +537,23 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                             >
                                                 <Trash2 className="w-3 h-3" />
                                             </button>
+                                          </div>
+                                        </div>
+                                        <div className="mt-1">
+                                          <label className="block text-[10px] text-neutral-500 uppercase mb-1">Cohort Banner Message (optional)</label>
+                                          <input
+                                            value={cohort.banner_message || ''}
+                                            onChange={(e) => {
+                                              const next = e.target.value;
+                                              setCohorts(prev => prev.map(c => c.id === cohort.id ? { ...c, banner_message: next } : c));
+                                            }}
+                                            onBlur={(e) => {
+                                              const next = e.target.value.trim();
+                                              supabase.from('cohorts').update({ banner_message: next || null }).eq('id', cohort.id);
+                                            }}
+                                            placeholder="Overrides global banner for teams in this cohort"
+                                            className="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-xs text-neutral-200 outline-none focus:border-yellow-500"
+                                          />
                                         </div>
                                     </div>
                                 );
