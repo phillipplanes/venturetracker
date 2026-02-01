@@ -11,8 +11,9 @@ const TeamCard = ({ team, onClick, phasesByCohort }) => {
       }, {})
     : (team.submissions || {});
   const cohortPhases = phasesByCohort?.[team.cohort_id] || [];
-  const totalTasks = cohortPhases.reduce((acc, p) => acc + p.tasks.length, 0);
-  const approvedCount = Object.values(submissions).filter(s => s.status === 'approved').length;
+  const taskIdSet = new Set(cohortPhases.flatMap(p => (p.tasks || []).map(t => t.id)));
+  const totalTasks = taskIdSet.size;
+  const approvedCount = Object.values(submissions).filter(s => taskIdSet.has(s.task_id) && s.status === 'approved').length;
   const progress = totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
 
   return (

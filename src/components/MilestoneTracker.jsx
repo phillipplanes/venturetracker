@@ -67,7 +67,8 @@ const MilestoneTracker = ({ team, phases, onSubmitTask, onReviewTask, onUploadPr
       setTimeout(() => fileInputRef.current?.click(), 0);
     };
 
-    const approvedCount = Object.values(submissions).filter(s => s.status === 'approved').length;
+    const phaseTaskIds = new Set(phases.flatMap(p => (p.tasks || []).map(t => t.id)));
+    const approvedCount = Object.values(submissions).filter(s => phaseTaskIds.has(s.task_id) && s.status === 'approved').length;
     
     return (
       <>

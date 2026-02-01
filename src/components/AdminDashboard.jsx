@@ -322,15 +322,16 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                         <div className="divide-y divide-neutral-800">
                             {teams.map(team => {
                                 const phases = cohortPhasesById[team.cohort_id] || [];
-                                const totalTasks = phases.reduce((acc, p) => acc + p.tasks.length, 0);
+                                const taskIdSet = new Set(phases.flatMap(p => (p.tasks || []).map(t => t.id)));
+                                const totalTasks = taskIdSet.size;
                                 const submissions = (team.team_submissions || []).reduce((acc, sub) => {
                                     acc[sub.task_id] = sub;
                                     return acc;
                                 }, {});
-                                const approvedCount = Object.values(submissions).filter(s => s.status === 'approved').length;
-                                const pendingCount = Object.values(submissions).filter(s => s.status === 'pending').length;
+                                const approvedCount = Object.values(submissions).filter(s => taskIdSet.has(s.task_id) && s.status === 'approved').length;
+                                const pendingCount = Object.values(submissions).filter(s => taskIdSet.has(s.task_id) && s.status === 'pending').length;
                                 const progress = totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
-                                const pendingTasks = Object.values(submissions).filter(s => s.status === 'pending').slice(0, 3);
+                                const pendingTasks = Object.values(submissions).filter(s => taskIdSet.has(s.task_id) && s.status === 'pending').slice(0, 3);
                                 const memberProfiles = (team.members || [])
                                     .map(id => profiles.find(p => p.id === id))
                                     .filter(Boolean);

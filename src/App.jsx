@@ -1000,8 +1000,9 @@ const VentureTracker = ({ supabase, isMock }) => {
         return acc;
       }, {})
     : (currentDisplayTeam?.submissions || {});
-  const totalTasks = phases.reduce((acc, p) => acc + p.tasks.length, 0);
-  const approvedCount = Object.values(submissions).filter(s => s.status === 'approved').length;
+  const taskIdSet = new Set(phases.flatMap(p => (p.tasks || []).map(t => t.id)));
+  const totalTasks = taskIdSet.size;
+  const approvedCount = Object.values(submissions).filter(s => taskIdSet.has(s.task_id) && s.status === 'approved').length;
   const progressPercent = totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
 
   const handleHomeNav = () => {
