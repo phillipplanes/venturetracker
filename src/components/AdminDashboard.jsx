@@ -60,6 +60,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     const [editingTeam, setEditingTeam] = useState(null);
     const [isCreatingUser, setIsCreatingUser] = useState(false);
     const [bannerStatus, setBannerStatus] = useState({});
+    const adminCardClass = "w-full md:w-1/2";
 
     const toLocalInputValue = (value) => {
         if (!value) return '';
@@ -475,8 +476,8 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             )}
 
             {tab === 'cohorts' && (
-                <div className="space-y-8 w-full">
-                    <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800 w-full">
+                <div className="space-y-8 w-full flex flex-col md:items-center">
+                    <div className={`bg-neutral-900 p-6 rounded-xl border border-neutral-800 ${adminCardClass}`}>
                         <h3 className="text-lg font-bold text-white mb-4">Create New Cohort</h3>
                         <div className="grid md:grid-cols-4 gap-3">
                             <input 
@@ -498,7 +499,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                             </button>
                         </div>
                     </div>
-                    <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800 w-full">
+                    <div className={`bg-neutral-900 p-6 rounded-xl border border-neutral-800 ${adminCardClass}`}>
                         <h3 className="text-lg font-bold text-white mb-4">Existing Cohorts</h3>
                         <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-neutral-700">
                             {cohorts.length === 0 && <p className="text-sm text-neutral-500 italic">No cohorts created yet.</p>}
@@ -599,7 +600,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             )}
 
             {tab === 'users' && (
-                <div className="space-y-6 w-full">
+                <div className="space-y-6 w-full flex flex-col md:items-center">
                     <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                         <div>
                             <h3 className="text-xl font-bold text-white">User Directory</h3>
@@ -620,7 +621,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                     </div>
                     
                     {/* Mobile cards */}
-                    <div className="md:hidden space-y-3 w-full">
+                    <div className={`md:hidden space-y-3 ${adminCardClass}`}>
                         {filteredProfiles.map(profile => {
                             const isAdmin = admins.some(a => a.email === profile.email);
                             const userTeams = teams.filter(t => t.members?.includes(profile.id));
@@ -664,7 +665,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                     </div>
 
                     {/* Desktop table */}
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden hidden md:block w-full">
+                    <div className={`bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden hidden md:block ${adminCardClass}`}>
                         <div className="w-full overflow-x-auto">
                         <table className="w-full text-left text-sm text-neutral-400">
                             <thead className="bg-neutral-950 text-neutral-500 uppercase text-xs font-bold">
@@ -786,7 +787,8 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             )}
 
             {tab === 'settings' && (
-                <div className="bg-neutral-900 p-6 md:p-8 rounded-xl border border-neutral-800 w-full">
+                <div className="w-full flex flex-col md:items-center">
+                  <div className={`bg-neutral-900 p-6 md:p-8 rounded-xl border border-neutral-800 ${adminCardClass}`}>
                     <h3 className="text-xl font-bold text-white mb-6">Global Settings</h3>
                     <div className="space-y-6">
                         <div>
@@ -807,6 +809,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                         </div>
                         <button onClick={saveSettings} disabled={uploading} className="bg-yellow-600 text-black font-bold px-6 py-2 rounded-lg hover:bg-yellow-500 disabled:opacity-50">{uploading ? 'Saving...' : 'Save Settings'}</button>
                     </div>
+                  </div>
                 </div>
             )}
 
