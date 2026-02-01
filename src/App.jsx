@@ -327,6 +327,7 @@ const VentureTracker = ({ supabase, isMock }) => {
   const [settings, setSettings] = useState(null);
   const [phases, setPhases] = useState([]);
   const [cohortPhasesById, setCohortPhasesById] = useState({});
+  const [cohorts, setCohorts] = useState([]);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   
   const [view, setView] = useState('dashboard'); // 'dashboard', 'all-teams', 'finances', 'team-summary'
@@ -364,6 +365,7 @@ const VentureTracker = ({ supabase, isMock }) => {
     fetchTeams();
     fetchAdmins();
     fetchProfiles();
+    fetchCohorts();
 
     // Set up Realtime Subscription for Teams
     const teamsSub = supabase.channel('public:teams')
@@ -372,7 +374,17 @@ const VentureTracker = ({ supabase, isMock }) => {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(teamsSub); };
+    // Set up Realtime Subscription for Cohorts (banner overrides)
+    const cohortsSub = supabase.channel('public:cohorts')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cohorts' }, () => {
+        fetchCohorts();
+      })
+      .subscribe();
+
+    return () => { 
+      supabase.removeChannel(teamsSub);
+      supabase.removeChannel(cohortsSub);
+    };
   }, [session]);
 
   useEffect(() => {
@@ -482,6 +494,11 @@ const VentureTracker = ({ supabase, isMock }) => {
           if (isAdminUser && !myTeam) setView('admin-dashboard');
           if (isAdminUser) setIsAdmin(true);
       }
+  };
+
+  const fetchCohorts = async () => {
+      const { data } = await supabase.from('cohorts').select('*').order('created_at', { ascending: false });
+      if (data) setCohorts(data);
   };
 
   const fetchProfiles = async () => {
@@ -994,6 +1011,8 @@ const VentureTracker = ({ supabase, isMock }) => {
 
   // Header Logic
   const currentDisplayTeam = view === 'team-summary' ? viewingTeam : myTeam;
+  const currentCohort = cohorts.find(c => c.id === currentDisplayTeam?.cohort_id);
+  const bannerMessage = currentCohort?.banner_message || settings?.banner_message;
   const submissions = currentDisplayTeam?.team_submissions
     ? currentDisplayTeam.team_submissions.reduce((acc, sub) => {
         acc[sub.task_id] = sub;
@@ -1017,7 +1036,7 @@ const VentureTracker = ({ supabase, isMock }) => {
             Demo Mode (Data is not saved)
           </div>
       )}
-      <CountdownBanner targetDate={settings?.pitch_date} message={settings?.banner_message} />
+      <CountdownBanner targetDate={settings?.pitch_date} message={bannerMessage} />
       {/* Mobile Top Bar */}
       <div className="md:hidden bg-neutral-950 border-b border-neutral-800 px-4 py-3 flex items-center justify-between sticky top-0 z-20 w-full">
         <button
