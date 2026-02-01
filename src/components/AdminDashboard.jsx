@@ -476,7 +476,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
 
             {tab === 'cohorts' && (
                 <div className="space-y-8 w-full">
-                    <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
+                    <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800 w-full">
                         <h3 className="text-lg font-bold text-white mb-4">Create New Cohort</h3>
                         <div className="grid md:grid-cols-4 gap-3">
                             <input 
@@ -498,7 +498,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                             </button>
                         </div>
                     </div>
-                    <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
+                    <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800 w-full">
                         <h3 className="text-lg font-bold text-white mb-4">Existing Cohorts</h3>
                         <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-neutral-700">
                             {cohorts.length === 0 && <p className="text-sm text-neutral-500 italic">No cohorts created yet.</p>}
@@ -620,7 +620,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                     </div>
                     
                     {/* Mobile cards */}
-                    <div className="md:hidden space-y-3">
+                    <div className="md:hidden space-y-3 w-full">
                         {filteredProfiles.map(profile => {
                             const isAdmin = admins.some(a => a.email === profile.email);
                             const userTeams = teams.filter(t => t.members?.includes(profile.id));
@@ -664,7 +664,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                     </div>
 
                     {/* Desktop table */}
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden hidden md:block">
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden hidden md:block w-full">
                         <div className="w-full overflow-x-auto">
                         <table className="w-full text-left text-sm text-neutral-400">
                             <thead className="bg-neutral-950 text-neutral-500 uppercase text-xs font-bold">
