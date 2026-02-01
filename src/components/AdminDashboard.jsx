@@ -282,7 +282,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     const tabs = ['overview', 'teams', 'users', 'cohorts', 'milestones', 'settings'];
 
     return (
-        <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto overflow-x-hidden">
+        <div className="px-4 md:px-8 py-6 w-full overflow-x-hidden">
             <h1 className="text-3xl font-bold text-white mb-8 flex items-center gap-3">
                 <Shield className="w-8 h-8 text-yellow-500" />
                 Admin Dashboard
