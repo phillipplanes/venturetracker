@@ -60,7 +60,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     const [editingTeam, setEditingTeam] = useState(null);
     const [isCreatingUser, setIsCreatingUser] = useState(false);
     const [bannerStatus, setBannerStatus] = useState({});
-    const adminCardClass = "w-full md:w-1/2";
+    const adminCardClass = "w-full";
 
     const toLocalInputValue = (value) => {
         if (!value) return '';
