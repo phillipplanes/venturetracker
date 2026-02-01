@@ -59,6 +59,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     const [copying, setCopying] = useState(false);
     const [editingTeam, setEditingTeam] = useState(null);
     const [isCreatingUser, setIsCreatingUser] = useState(false);
+    const [bannerStatus, setBannerStatus] = useState({});
 
     const toLocalInputValue = (value) => {
         if (!value) return '';
@@ -555,19 +556,39 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                         </div>
                                         <div className="mt-1">
                                           <label className="block text-[10px] text-neutral-500 uppercase mb-1">Cohort Banner Message (optional)</label>
-                                          <input
-                                            value={cohort.banner_message || ''}
-                                            onChange={(e) => {
-                                              const next = e.target.value;
-                                              setCohorts(prev => prev.map(c => c.id === cohort.id ? { ...c, banner_message: next } : c));
-                                            }}
-                                            onBlur={(e) => {
-                                              const next = e.target.value.trim();
-                                              supabase.from('cohorts').update({ banner_message: next || null }).eq('id', cohort.id);
-                                            }}
-                                            placeholder="Overrides global banner for teams in this cohort"
-                                            className="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-xs text-neutral-200 outline-none focus:border-yellow-500"
-                                          />
+                                          <div className="flex flex-col md:flex-row gap-2">
+                                            <input
+                                              value={cohort.banner_message || ''}
+                                              onChange={(e) => {
+                                                const next = e.target.value;
+                                                setCohorts(prev => prev.map(c => c.id === cohort.id ? { ...c, banner_message: next } : c));
+                                                setBannerStatus(prev => ({ ...prev, [cohort.id]: '' }));
+                                              }}
+                                              placeholder="Overrides global banner for teams in this cohort"
+                                              className="w-full bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-xs text-neutral-200 outline-none focus:border-yellow-500"
+                                            />
+                                            <button
+                                              onClick={async () => {
+                                                const next = (cohort.banner_message || '').trim();
+                                                setBannerStatus(prev => ({ ...prev, [cohort.id]: 'saving' }));
+                                                const { error } = await supabase.from('cohorts').update({ banner_message: next || null }).eq('id', cohort.id);
+                                                if (error) {
+                                                  setBannerStatus(prev => ({ ...prev, [cohort.id]: 'error' }));
+                                                } else {
+                                                  setBannerStatus(prev => ({ ...prev, [cohort.id]: 'saved' }));
+                                                }
+                                              }}
+                                              className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs px-3 py-2 rounded-md border border-neutral-700"
+                                            >
+                                              Save
+                                            </button>
+                                          </div>
+                                          {bannerStatus[cohort.id] === 'saved' && (
+                                            <p className="text-[10px] text-green-400 mt-1">Saved</p>
+                                          )}
+                                          {bannerStatus[cohort.id] === 'error' && (
+                                            <p className="text-[10px] text-red-400 mt-1">Save failed</p>
+                                          )}
                                         </div>
                                     </div>
                                 );
