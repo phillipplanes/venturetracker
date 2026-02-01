@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './index.css';
 import { 
-  Rocket, Users, Layout, Settings, Calendar, Shield, LogOut
+  Rocket, Users, Layout, Settings, Calendar, Shield, LogOut, Sun, Moon
 , DollarSign, ArrowLeft
 } from 'lucide-react';
 import LoadingScreen from './components/LoadingScreen';
@@ -338,6 +338,10 @@ const VentureTracker = ({ supabase, isMock }) => {
   const [joinRequest, setJoinRequest] = useState(null);
   const [joinCohortId, setJoinCohortId] = useState('');
   const [joinSubmitting, setJoinSubmitting] = useState(false);
+  const [theme, setTheme] = useState(() => {
+    const stored = window.localStorage.getItem('theme');
+    return stored || 'dark';
+  });
   
   const [view, setView] = useState('dashboard'); // 'dashboard', 'all-teams', 'finances', 'team-summary'
   const [viewingTeam, setViewingTeam] = useState(null); // The team being viewed in public directory
@@ -363,6 +367,15 @@ const VentureTracker = ({ supabase, isMock }) => {
 
     return () => subscription.unsubscribe();
   }, [supabase]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   // 2. Fetch Data (Teams & Settings)
   useEffect(() => {
@@ -1152,6 +1165,13 @@ const VentureTracker = ({ supabase, isMock }) => {
                       <span className="font-bold text-white">VentureTracker <span className="text-neutral-500 font-normal">| Admin</span></span>
                   </div>
                   <div className="flex items-center gap-4">
+                      <button
+                        onClick={toggleTheme}
+                        className="text-sm text-neutral-400 hover:text-white flex items-center gap-2"
+                      >
+                        {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                        {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                      </button>
                       {myTeam && <button onClick={() => setView('dashboard')} className="text-sm text-neutral-400 hover:text-white">Student View</button>}
                       <button onClick={() => supabase.auth.signOut()} className="text-sm text-neutral-400 hover:text-white flex items-center gap-2">Sign Out <LogOut className="w-4 h-4"/></button>
                   </div>
@@ -1189,9 +1209,18 @@ const VentureTracker = ({ supabase, isMock }) => {
             <Rocket className="w-6 h-6 text-yellow-500" />
             <span className="font-bold text-white">VentureTracker</span>
           </div>
-          <button onClick={() => supabase.auth.signOut()} className="text-sm text-neutral-400 hover:text-white flex items-center gap-2">
-             Sign Out <LogOut className="w-4 h-4"/>
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={toggleTheme}
+              className="text-sm text-neutral-400 hover:text-white flex items-center gap-2"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            </button>
+            <button onClick={() => supabase.auth.signOut()} className="text-sm text-neutral-400 hover:text-white flex items-center gap-2">
+               Sign Out <LogOut className="w-4 h-4"/>
+            </button>
+          </div>
         </header>
         <div className="px-4 md:px-8 py-10 max-w-3xl mx-auto w-full">
           {!isApproved && (
@@ -1287,12 +1316,20 @@ const VentureTracker = ({ supabase, isMock }) => {
           <Rocket className="w-5 h-5 text-yellow-500" />
           <span className="font-bold text-white">VentureTracker</span>
         </button>
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="text-sm text-neutral-300 border border-neutral-800 px-3 py-1.5 rounded-lg hover:bg-neutral-900"
-        >
-          Menu
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleTheme}
+            className="text-sm text-neutral-300 border border-neutral-800 px-3 py-1.5 rounded-lg hover:bg-neutral-900 flex items-center gap-2"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="text-sm text-neutral-300 border border-neutral-800 px-3 py-1.5 rounded-lg hover:bg-neutral-900"
+          >
+            Menu
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -1451,7 +1488,9 @@ const VentureTracker = ({ supabase, isMock }) => {
 
             {view === 'all-teams' && (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {allTeams.map(team => (
+                {(isAuthorizedAdmin ? allTeams : allTeams.filter(team => (
+                    myTeam?.cohort_id && team.cohort_id === myTeam.cohort_id
+                ))).map(team => (
                     <TeamCard 
                         key={team.id} 
                         team={team} 

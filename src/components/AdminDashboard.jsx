@@ -69,6 +69,8 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     const [teamCohortFilter, setTeamCohortFilter] = useState('');
     const [dragTask, setDragTask] = useState(null);
     const [joinRequests, setJoinRequests] = useState([]);
+    const [teamUpdatesById, setTeamUpdatesById] = useState({});
+    const [teamDetailsOpen, setTeamDetailsOpen] = useState({});
     const adminCardClass = "w-full";
     const adminFormClass = "w-full max-w-5xl mx-auto";
 
@@ -114,6 +116,12 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             fetchCohorts();
         }
     }, [tab, supabase]);
+
+    useEffect(() => {
+        if (tab === 'teams') {
+            fetchTeamUpdates();
+        }
+    }, [tab, teams.length, supabase]);
 
     useEffect(() => {
         if (tab === 'users') {
@@ -238,6 +246,23 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
         } else {
             setJoinRequests(data || []);
         }
+    };
+
+    const fetchTeamUpdates = async () => {
+        const { data, error } = await supabase
+            .from('updates')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) {
+            console.error('Error fetching updates for admin:', error);
+            return;
+        }
+        const grouped = {};
+        (data || []).forEach((u) => {
+            if (!grouped[u.team_id]) grouped[u.team_id] = [];
+            grouped[u.team_id].push(u);
+        });
+        setTeamUpdatesById(grouped);
     };
 
     const handleApproveJoinRequest = async (request) => {
@@ -588,48 +613,105 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                     const memberProfiles = (team.members || [])
                                         .map(id => profiles.find(p => p.id === id))
                                         .filter(Boolean);
+                                    const updatesForTeam = teamUpdatesById[team.id] || [];
+                                    const feedbackForTeam = team.feedback || [];
+                                    const isExpanded = Boolean(teamDetailsOpen[team.id]);
                                     return (
-                                        <div key={team.id} className="bg-neutral-900 p-4 rounded-lg border border-neutral-800 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-                                            <div className="flex items-start gap-4 min-w-0">
-                                                <TeamLogo url={team.logo_display_url || team.logo_url} name={team.name} />
-                                                <div className="min-w-0">
-                                                    <h4 className="font-bold text-white">{team.name}</h4>
-                                                    <p className="text-xs text-neutral-500 line-clamp-2">{team.description || 'No description'}</p>
-                                                    <div className="mt-2 flex flex-wrap gap-1">
-                                                        {memberProfiles.length > 0 ? memberProfiles.map(m => (
-                                                            <span key={m.id} className="px-2 py-0.5 bg-neutral-800 rounded text-xs text-neutral-300 border border-neutral-700">
-                                                                {m.email || m.full_name || m.id}
-                                                            </span>
-                                                        )) : (
-                                                            <span className="text-neutral-600 italic text-xs">No members</span>
+                                        <div key={team.id} className="bg-neutral-900 p-4 rounded-lg border border-neutral-800 flex flex-col gap-4">
+                                            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+                                                <div className="flex items-start gap-4 min-w-0">
+                                                    <TeamLogo url={team.logo_display_url || team.logo_url} name={team.name} />
+                                                    <div className="min-w-0">
+                                                        <h4 className="font-bold text-white">{team.name}</h4>
+                                                        <p className="text-xs text-neutral-500 line-clamp-2">{team.description || 'No description'}</p>
+                                                        <div className="mt-2 flex flex-wrap gap-1">
+                                                            {memberProfiles.length > 0 ? memberProfiles.map(m => (
+                                                                <span key={m.id} className="px-2 py-0.5 bg-neutral-800 rounded text-xs text-neutral-300 border border-neutral-700">
+                                                                    {m.email || m.full_name || m.id}
+                                                                </span>
+                                                            )) : (
+                                                                <span className="text-neutral-600 italic text-xs">No members</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <select
+                                                        value={team.cohort_id || ''}
+                                                        onChange={(e) => onAssignCohort(team.id, e.target.value)}
+                                                        className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs rounded-md px-2 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                                                    >
+                                                        <option value="">Assign Cohort...</option>
+                                                        {cohorts.map(c => (
+                                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                                        ))}
+                                                    </select>
+                                                    <button onClick={() => setEditingTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition flex items-center gap-1">
+                                                        <Edit2 className="w-3 h-3" /> Edit
+                                                    </button>
+                                                    <button onClick={() => onViewTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition">
+                                                        View Dashboard
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => setTeamToDelete(team)} 
+                                                        className="text-xs bg-red-900/20 hover:bg-red-900/40 text-red-400 px-3 py-2 rounded-md border border-red-900/30 transition flex items-center gap-1"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" /> Delete
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setTeamDetailsOpen(prev => ({ ...prev, [team.id]: !prev[team.id] }))}
+                                                        className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-2 rounded-md border border-neutral-700 transition"
+                                                    >
+                                                        {isExpanded ? 'Hide Updates' : 'Show Updates'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {isExpanded && (
+                                                <div className="grid md:grid-cols-2 gap-4 border-t border-neutral-800 pt-4">
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <h5 className="text-xs uppercase font-bold text-neutral-500">Weekly Updates</h5>
+                                                            <span className="text-[10px] text-neutral-500">{updatesForTeam.length} total</span>
+                                                        </div>
+                                                        {updatesForTeam.length === 0 ? (
+                                                            <p className="text-xs text-neutral-600 italic">No updates yet.</p>
+                                                        ) : (
+                                                            <div className="space-y-2 max-h-56 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-neutral-700">
+                                                                {updatesForTeam.map(update => (
+                                                                    <div key={update.id} className="bg-neutral-950 border border-neutral-800 rounded-md p-3">
+                                                                        <p className="text-sm text-neutral-200">{update.content || 'No content'}</p>
+                                                                        <div className="flex items-center justify-between text-[10px] text-neutral-500 mt-2">
+                                                                            <span>{update.author_email || update.author_id || 'Unknown'}</span>
+                                                                            <span>{update.created_at ? new Date(update.created_at).toLocaleDateString() : ''}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <h5 className="text-xs uppercase font-bold text-neutral-500">Professor Feedback</h5>
+                                                            <span className="text-[10px] text-neutral-500">{feedbackForTeam.length} total</span>
+                                                        </div>
+                                                        {feedbackForTeam.length === 0 ? (
+                                                            <p className="text-xs text-neutral-600 italic">No feedback yet.</p>
+                                                        ) : (
+                                                            <div className="space-y-2 max-h-56 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-neutral-700">
+                                                                {feedbackForTeam.map((item, idx) => (
+                                                                    <div key={`${team.id}-feedback-${idx}`} className="bg-neutral-950 border border-neutral-800 rounded-md p-3">
+                                                                        <p className="text-sm text-neutral-200">{item.text || item.content || item.note || 'Feedback note'}</p>
+                                                                        <div className="flex items-center justify-between text-[10px] text-neutral-500 mt-2">
+                                                                            <span>{item.author_email || item.author || 'Instructor'}</span>
+                                                                            <span>{item.created_at ? new Date(item.created_at).toLocaleDateString() : ''}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <select
-                                                    value={team.cohort_id || ''}
-                                                    onChange={(e) => onAssignCohort(team.id, e.target.value)}
-                                                    className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs rounded-md px-2 py-2 focus:ring-yellow-500 focus:border-yellow-500"
-                                                >
-                                                    <option value="">Assign Cohort...</option>
-                                                    {cohorts.map(c => (
-                                                        <option key={c.id} value={c.id}>{c.name}</option>
-                                                    ))}
-                                                </select>
-                                                <button onClick={() => setEditingTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition flex items-center gap-1">
-                                                    <Edit2 className="w-3 h-3" /> Edit
-                                                </button>
-                                                <button onClick={() => onViewTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition">
-                                                    View Dashboard
-                                                </button>
-                                                <button 
-                                                    onClick={() => setTeamToDelete(team)} 
-                                                    className="text-xs bg-red-900/20 hover:bg-red-900/40 text-red-400 px-3 py-2 rounded-md border border-red-900/30 transition flex items-center gap-1"
-                                                >
-                                                    <Trash2 className="w-3 h-3" /> Delete
-                                                </button>
-                                            </div>
+                                            )}
                                         </div>
                                     );
                                 })}

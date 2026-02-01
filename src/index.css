@@ -2,9 +2,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 :root {
-  color-scheme: dark;
+  color-scheme: light dark;
   --font-body: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
   --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 body {
@@ -29,3 +37,34 @@ h1, h2, h3, h4 {
 .animate-fade-in {
   animation: fadeIn 0.5s ease-out forwards;
 }
+
+:root[data-theme="light"] .bg-black { background-color: #f3f5f8 !important; }
+:root[data-theme="light"] .bg-neutral-950 { background-color: #f8f9fb !important; }
+:root[data-theme="light"] .bg-neutral-900 { background-color: #ffffff !important; }
+:root[data-theme="light"] .bg-neutral-800 { background-color: #eef1f5 !important; }
+:root[data-theme="light"] .bg-neutral-700 { background-color: #e1e6ee !important; }
+
+:root[data-theme="light"] .border-neutral-800 { border-color: #e2e7ef !important; }
+:root[data-theme="light"] .border-neutral-700 { border-color: #d7dee8 !important; }
+:root[data-theme="light"] .border-neutral-900 { border-color: #e2e7ef !important; }
+
+:root[data-theme="light"] .text-white { color: #101214 !important; }
+:root[data-theme="light"] .text-neutral-400 { color: #475061 !important; }
+:root[data-theme="light"] .text-neutral-500 { color: #5b6578 !important; }
+:root[data-theme="light"] .text-neutral-600 { color: #6a7386 !important; }
+:root[data-theme="light"] .text-neutral-300 { color: #2a2f36 !important; }
+
+:root[data-theme="light"] .bg-yellow-900\/20 { background-color: rgba(245, 185, 0, 0.18) !important; }
+:root[data-theme="light"] .bg-yellow-900\/30 { background-color: rgba(245, 185, 0, 0.25) !important; }
+:root[data-theme="light"] .bg-yellow-900\/50 { background-color: rgba(245, 185, 0, 0.35) !important; }
+:root[data-theme="light"] .bg-red-900\/20 { background-color: rgba(220, 38, 38, 0.12) !important; }
+:root[data-theme="light"] .bg-neutral-900\/50 { background-color: rgba(255, 255, 255, 0.7) !important; }
+:root[data-theme="light"] .bg-neutral-800\/40 { background-color: rgba(220, 226, 235, 0.7) !important; }
+:root[data-theme="light"] .bg-neutral-950\/70 { background-color: rgba(248, 249, 251, 0.85) !important; }
+:root[data-theme="light"] .bg-green-950\/20 { background-color: rgba(16, 185, 129, 0.12) !important; }
+
+:root[data-theme="light"] .text-green-400 { color: #0f5132 !important; }
+:root[data-theme="light"] .text-green-500 { color: #0b5d3b !important; }
+:root[data-theme="light"] .text-green-600 { color: #0a4d32 !important; }
+
+:root[data-theme="light"] .border-green-900\/30 { border-color: rgba(16, 185, 129, 0.35) !important; }
