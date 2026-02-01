@@ -308,7 +308,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             </div>
 
             {tab === 'overview' && (
-                <div className="space-y-6">
+                <div className="space-y-6 w-full">
                     <div className="grid grid-cols-3 gap-3 md:gap-6">
                         <div className="bg-neutral-900 p-4 md:p-6 rounded-xl border border-neutral-800">
                             <h3 className="text-neutral-400 text-[10px] md:text-xs uppercase font-bold mb-2">
@@ -429,7 +429,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             )}
 
             {tab === 'teams' && (
-                    <div className="space-y-4">
+                <div className="space-y-4 w-full">
                         <div className="flex justify-end">
                             <button onClick={() => setEditingTeam({ name: '', description: '' })} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 text-sm flex items-center gap-2">
                                 <Plus className="w-4 h-4" />
@@ -475,7 +475,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             )}
 
             {tab === 'cohorts' && (
-                <div className="space-y-8">
+                <div className="space-y-8 w-full">
                     <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800">
                         <h3 className="text-lg font-bold text-white mb-4">Create New Cohort</h3>
                         <div className="grid md:grid-cols-4 gap-3">
@@ -599,7 +599,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             )}
 
             {tab === 'users' && (
-                <div className="space-y-6">
+                <div className="space-y-6 w-full">
                     <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                         <div>
                             <h3 className="text-xl font-bold text-white">User Directory</h3>
@@ -719,7 +719,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             )}
 
             {tab === 'milestones' && (
-                <div className="bg-neutral-900 p-8 rounded-xl border border-neutral-800">
+                <div className="bg-neutral-900 p-8 rounded-xl border border-neutral-800 w-full">
                     <h3 className="text-xl font-bold text-white mb-2">Edit Milestones</h3>
                     <p className="text-sm text-neutral-400 mb-6">Select a cohort to configure its venture roadmap.</p>
 
@@ -786,7 +786,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             )}
 
             {tab === 'settings' && (
-                <div className="bg-neutral-900 p-6 md:p-8 rounded-xl border border-neutral-800 w-full md:max-w-2xl">
+                <div className="bg-neutral-900 p-6 md:p-8 rounded-xl border border-neutral-800 w-full">
                     <h3 className="text-xl font-bold text-white mb-6">Global Settings</h3>
                     <div className="space-y-6">
                         <div>
