@@ -55,11 +55,14 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     const [cohorts, setCohorts] = useState([]);
     const [newCohortName, setNewCohortName] = useState('');
     const [newCohortStatus, setNewCohortStatus] = useState('active');
+    const [newCohortStart, setNewCohortStart] = useState('');
+    const [newCohortEnd, setNewCohortEnd] = useState('');
     const [selectedMilestoneCohort, setSelectedMilestoneCohort] = useState('');
     const [copying, setCopying] = useState(false);
     const [editingTeam, setEditingTeam] = useState(null);
     const [isCreatingUser, setIsCreatingUser] = useState(false);
     const [bannerStatus, setBannerStatus] = useState({});
+    const [dateStatus, setDateStatus] = useState({});
     const adminCardClass = "w-full";
 
     const toLocalInputValue = (value) => {
@@ -181,10 +184,17 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
 
     const handleCreateCohort = async () => {
         if (!newCohortName.trim()) return;
-        const { error } = await supabase.from('cohorts').insert([{ name: newCohortName, status: newCohortStatus }]);
+        const { error } = await supabase.from('cohorts').insert([{
+            name: newCohortName,
+            status: newCohortStatus,
+            start_date: newCohortStart || null,
+            end_date: newCohortEnd || null
+        }]);
         if (!error) {
             setNewCohortName('');
             setNewCohortStatus('active');
+            setNewCohortStart('');
+            setNewCohortEnd('');
             fetchCohorts();
         } else {
             alert("Failed to create cohort: " + error.message);
@@ -479,9 +489,9 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                 <div className="space-y-8 w-full flex flex-col md:items-center">
                     <div className={`bg-neutral-900 p-6 rounded-xl border border-neutral-800 ${adminCardClass}`}>
                         <h3 className="text-lg font-bold text-white mb-4">Create New Cohort</h3>
-                        <div className="grid md:grid-cols-4 gap-3">
+                        <div className="grid md:grid-cols-6 gap-3">
                             <input 
-                                className="w-full md:col-span-1 bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white outline-none focus:border-yellow-500"
+                                className="w-full md:col-span-2 bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white outline-none focus:border-yellow-500"
                                 placeholder="e.g., Fall 2024"
                                 value={newCohortName}
                                 onChange={(e) => setNewCohortName(e.target.value)}
@@ -494,6 +504,18 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                 <option value="active">Active</option>
                                 <option value="closed">Closed</option>
                             </select>
+                            <input
+                                type="date"
+                                value={newCohortStart}
+                                onChange={(e) => setNewCohortStart(e.target.value)}
+                                className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                            />
+                            <input
+                                type="date"
+                                value={newCohortEnd}
+                                onChange={(e) => setNewCohortEnd(e.target.value)}
+                                className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                            />
                             <button onClick={handleCreateCohort} disabled={!newCohortName.trim() || uploading} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 disabled:opacity-50">
                                 Create
                             </button>
@@ -589,6 +611,54 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                           )}
                                           {bannerStatus[cohort.id] === 'error' && (
                                             <p className="text-[10px] text-red-400 mt-1">Save failed</p>
+                                          )}
+                                        </div>
+                                        <div className="mt-2">
+                                          <label className="block text-[10px] text-neutral-500 uppercase mb-1">Cohort Dates</label>
+                                          <div className="flex flex-col md:flex-row gap-2">
+                                            <input
+                                              type="date"
+                                              value={cohort.start_date || ''}
+                                              onChange={(e) => {
+                                                const next = e.target.value;
+                                                setCohorts(prev => prev.map(c => c.id === cohort.id ? { ...c, start_date: next } : c));
+                                                setDateStatus(prev => ({ ...prev, [cohort.id]: '' }));
+                                              }}
+                                              className="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-xs text-neutral-200 outline-none focus:border-yellow-500"
+                                            />
+                                            <input
+                                              type="date"
+                                              value={cohort.end_date || ''}
+                                              onChange={(e) => {
+                                                const next = e.target.value;
+                                                setCohorts(prev => prev.map(c => c.id === cohort.id ? { ...c, end_date: next } : c));
+                                                setDateStatus(prev => ({ ...prev, [cohort.id]: '' }));
+                                              }}
+                                              className="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-xs text-neutral-200 outline-none focus:border-yellow-500"
+                                            />
+                                            <button
+                                              onClick={async () => {
+                                                setDateStatus(prev => ({ ...prev, [cohort.id]: 'saving' }));
+                                                const { error } = await supabase.from('cohorts').update({
+                                                  start_date: cohort.start_date || null,
+                                                  end_date: cohort.end_date || null
+                                                }).eq('id', cohort.id);
+                                                if (error) {
+                                                  setDateStatus(prev => ({ ...prev, [cohort.id]: 'error' }));
+                                                } else {
+                                                  setDateStatus(prev => ({ ...prev, [cohort.id]: 'saved' }));
+                                                }
+                                              }}
+                                              className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs px-3 py-2 rounded-md border border-neutral-700"
+                                            >
+                                              Save Dates
+                                            </button>
+                                          </div>
+                                          {dateStatus[cohort.id] === 'saved' && (
+                                            <p className="text-[10px] text-green-400 mt-1">Dates saved</p>
+                                          )}
+                                          {dateStatus[cohort.id] === 'error' && (
+                                            <p className="text-[10px] text-red-400 mt-1">Date save failed</p>
                                           )}
                                         </div>
                                     </div>
