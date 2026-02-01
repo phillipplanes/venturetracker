@@ -565,26 +565,71 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
 
             {tab === 'users' && (
                 <div className="space-y-6">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                         <div>
                             <h3 className="text-xl font-bold text-white">User Directory</h3>
                             <p className="text-sm text-neutral-500">{profiles.length} users</p>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                             <input 
                                 type="text" 
                                 placeholder="Search users..." 
-                                className="bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-2 text-white text-sm focus:border-yellow-500 outline-none w-64"
+                                className="bg-neutral-900 border border-neutral-800 rounded-lg px-4 py-2 text-white text-sm focus:border-yellow-500 outline-none w-full sm:w-64"
                                 value={userSearch}
                                 onChange={(e) => setUserSearch(e.target.value)}
                             />
-                            <button onClick={() => setIsCreatingUser(true)} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 text-sm flex items-center gap-2">
+                            <button onClick={() => setIsCreatingUser(true)} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 text-sm flex items-center justify-center gap-2">
                                 <Plus className="w-4 h-4" /> Create User
                             </button>
                         </div>
                     </div>
                     
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+                    {/* Mobile cards */}
+                    <div className="md:hidden space-y-3">
+                        {filteredProfiles.map(profile => {
+                            const isAdmin = admins.some(a => a.email === profile.email);
+                            const userTeams = teams.filter(t => t.members?.includes(profile.id));
+                            return (
+                                <div key={profile.id} className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="font-bold text-white">{profile.email}</p>
+                                            <div className="mt-1 flex items-center gap-2">
+                                                <span className={`px-2 py-1 text-xs font-bold rounded-full ${
+                                                    profile.role === 'admin' ? 'bg-yellow-900/30 text-yellow-400' :
+                                                    profile.role === 'mentor' ? 'bg-blue-900/30 text-blue-400' :
+                                                    'bg-neutral-800 text-neutral-300'
+                                                }`}>{profile.role}</span>
+                                                <label className="flex items-center gap-2 text-xs text-neutral-400">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={isAdmin} 
+                                                        onChange={(e) => e.target.checked ? onAddAdmin(profile.email) : onRemoveAdmin(admins.find(a => a.email === profile.email)?.id)}
+                                                        className="rounded bg-neutral-800 border-neutral-700 text-yellow-600 focus:ring-yellow-600"
+                                                    />
+                                                    Admin
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-3">
+                                        <p className="text-[10px] text-neutral-500 uppercase font-bold mb-2">Teams</p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {userTeams.length > 0 ? userTeams.map(t => (
+                                                <span key={t.id} className="px-2 py-0.5 bg-neutral-800 rounded text-xs text-neutral-300 border border-neutral-700">{t.name}</span>
+                                            )) : <span className="text-neutral-600 italic text-xs">No Team</span>}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {filteredProfiles.length === 0 && (
+                            <div className="p-8 text-center text-neutral-600 italic">No users found.</div>
+                        )}
+                    </div>
+
+                    {/* Desktop table */}
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden hidden md:block">
                         <div className="w-full overflow-x-auto">
                         <table className="w-full text-left text-sm text-neutral-400">
                             <thead className="bg-neutral-950 text-neutral-500 uppercase text-xs font-bold">
