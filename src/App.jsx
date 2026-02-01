@@ -139,6 +139,7 @@ class MockSupabaseClient {
     this.cohorts = [...MOCK_COHORTS];
     this.milestone_phases = [...MOCK_MILESTONE_PHASES];
     this.milestone_tasks = [...MOCK_MILESTONE_TASKS];
+    this.cohort_join_requests = [];
     this.profiles = [];
     this.subs = {};
   }
@@ -203,6 +204,7 @@ class MockSupabaseClient {
                tasks: self.milestone_tasks.filter(t => t.phase_id === p.id)
              }));
              if (table === 'milestone_tasks') data = self.milestone_tasks;
+             if (table === 'cohort_join_requests') data = self.cohort_join_requests;
              // Mock sort (simple)
              return { data, error: null };
           },
@@ -236,6 +238,7 @@ class MockSupabaseClient {
                           tasks: self.milestone_tasks.filter(t => t.phase_id === p.id)
                         }));
                     }
+                    if (table === 'cohort_join_requests') data = self.cohort_join_requests;
                     
                     return { data: data.filter(u => u[col] === val), error: null };
                  }
@@ -251,6 +254,7 @@ class MockSupabaseClient {
         if (table === 'cohorts') self.cohorts.unshift(row);
         if (table === 'milestone_phases') self.milestone_phases.unshift(row);
         if (table === 'milestone_tasks') self.milestone_tasks.unshift(row);
+        if (table === 'cohort_join_requests') self.cohort_join_requests.unshift(row);
         return { data: [row], error: null };
       },
       update: (updates) => {
@@ -331,6 +335,9 @@ const VentureTracker = ({ supabase, isMock }) => {
   const [tags, setTags] = useState([]);
   const [teamTagIds, setTeamTagIds] = useState([]);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [joinRequest, setJoinRequest] = useState(null);
+  const [joinCohortId, setJoinCohortId] = useState('');
+  const [joinSubmitting, setJoinSubmitting] = useState(false);
   
   const [view, setView] = useState('dashboard'); // 'dashboard', 'all-teams', 'finances', 'team-summary'
   const [viewingTeam, setViewingTeam] = useState(null); // The team being viewed in public directory
@@ -351,6 +358,7 @@ const VentureTracker = ({ supabase, isMock }) => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session?.user) ensureProfile(session.user);
     });
 
     return () => subscription.unsubscribe();
@@ -360,6 +368,7 @@ const VentureTracker = ({ supabase, isMock }) => {
   useEffect(() => {
     if (!session) return;
 
+    ensureProfile(session.user);
     // Fetch Settings (runs once)
     supabase.from('settings').select('*').single().then(({ data }) => setSettings(data));
 
@@ -368,6 +377,7 @@ const VentureTracker = ({ supabase, isMock }) => {
     fetchAdmins();
     fetchProfiles();
     fetchCohorts();
+    fetchJoinRequest();
     fetchTags();
 
     // Set up Realtime Subscription for Teams
@@ -384,9 +394,16 @@ const VentureTracker = ({ supabase, isMock }) => {
       })
       .subscribe();
 
+    const joinReqSub = supabase.channel('public:cohort_join_requests')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cohort_join_requests', filter: `user_id=eq.${session.user.id}` }, () => {
+        fetchJoinRequest();
+      })
+      .subscribe();
+
     return () => { 
       supabase.removeChannel(teamsSub);
       supabase.removeChannel(cohortsSub);
+      supabase.removeChannel(joinReqSub);
     };
   }, [session]);
 
@@ -505,9 +522,93 @@ const VentureTracker = ({ supabase, isMock }) => {
       if (data) setCohorts(data);
   };
 
+  const fetchJoinRequest = async () => {
+      if (!session?.user?.id) return;
+      const { data, error } = await supabase
+        .from('cohort_join_requests')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false });
+      if (error) {
+        console.error('Error fetching join request:', error);
+        return;
+      }
+      const latest = Array.isArray(data) ? data[0] : data;
+      if (latest) {
+        setJoinRequest(latest);
+        setJoinCohortId(latest.cohort_id || '');
+      }
+  };
+
+  const handleSubmitJoinRequest = async () => {
+      if (!joinCohortId || !session?.user) return;
+      setJoinSubmitting(true);
+      const { data, error } = await supabase
+        .from('cohort_join_requests')
+        .insert([{
+          user_id: session.user.id,
+          email: session.user.email,
+          cohort_id: joinCohortId,
+          status: 'pending'
+        }])
+        .select()
+        .single();
+      if (error) {
+        alert('Failed to submit cohort request: ' + error.message);
+      } else {
+        setJoinRequest(data);
+      }
+      setJoinSubmitting(false);
+  };
+
   const fetchProfiles = async () => {
       const { data } = await supabase.from('profiles').select('*');
       if (data) setProfiles(data);
+  };
+
+  const ensureProfile = async (user) => {
+      if (!user || isMock) return;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, role, email, full_name, avatar_url')
+        .eq('id', user.id);
+      if (error) {
+        console.error('Failed to fetch profile:', error);
+        return;
+      }
+      if (!data || data.length === 0) {
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.user_metadata?.name || null,
+            avatar_url: user.user_metadata?.avatar_url || null,
+            role: 'viewer'
+          }]);
+        if (insertError) {
+          console.error('Failed to insert profile:', insertError);
+          return;
+        }
+      } else {
+        const existing = data[0];
+        const updates = {};
+        if (!existing.email && user.email) updates.email = user.email;
+        if (!existing.full_name && (user.user_metadata?.full_name || user.user_metadata?.name)) {
+          updates.full_name = user.user_metadata?.full_name || user.user_metadata?.name;
+        }
+        if (!existing.avatar_url && user.user_metadata?.avatar_url) updates.avatar_url = user.user_metadata?.avatar_url;
+        if (Object.keys(updates).length > 0) {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update(updates)
+            .eq('id', user.id);
+          if (updateError) {
+            console.error('Failed to update profile:', updateError);
+          }
+        }
+      }
+      fetchProfiles();
   };
 
   const fetchTags = async () => {
@@ -636,13 +737,16 @@ const VentureTracker = ({ supabase, isMock }) => {
         logo_url = await uploadFile(logoFile, 'team-logos');
         setUploading(false);
     }
+    const myProfile = profiles.find(p => p.id === session.user.id);
+    const cohortId = myProfile?.cohort_id || (joinRequest?.status === 'approved' ? joinRequest.cohort_id : null);
     const { data, error } = await supabase.from('teams').insert([{
         name,
         description,
         logo_url,
         members: [session.user.id],
         submissions: {}, 
-        task_evidence: {}
+        task_evidence: {},
+        cohort_id: cohortId
     }]).select();
 
     if (!error && data) {
@@ -661,12 +765,14 @@ const VentureTracker = ({ supabase, isMock }) => {
 
   const handleAssignCohort = async (teamId, cohortId) => {
     const newCohortId = cohortId === '' ? null : cohortId;
+    setAllTeams(prev => prev.map(t => t.id === teamId ? { ...t, cohort_id: newCohortId } : t));
     const { error } = await supabase
         .from('teams')
         .update({ cohort_id: newCohortId })
         .eq('id', teamId);
     if (error) {
         alert('Failed to assign cohort: ' + error.message);
+        fetchTeams();
     } // The realtime subscription will trigger fetchTeams() on success
   };
 
@@ -984,6 +1090,35 @@ const VentureTracker = ({ supabase, isMock }) => {
       await supabase.from('transactions').update({ amount: updatedTx.amount, description: updatedTx.description, type: updatedTx.type }).eq('id', updatedTx.id);
   };
 
+  const handleDeleteUser = async (profile) => {
+      if (!profile) return;
+      const confirmText = `Delete ${profile.email || 'this user'}? This removes their profile and unassigns them from teams.`;
+      if (!window.confirm(confirmText)) return;
+      setUploading(true);
+      try {
+        const affectedTeams = allTeams.filter(t => (t.members || []).includes(profile.id));
+        await Promise.all(
+          affectedTeams.map(team => {
+            const nextMembers = (team.members || []).filter(id => id !== profile.id);
+            return supabase.from('teams').update({ members: nextMembers }).eq('id', team.id);
+          })
+        );
+        const adminRow = adminList.find(a => a.email === profile.email);
+        if (adminRow) {
+          await supabase.from('admins').delete().eq('id', adminRow.id);
+        }
+        await supabase.from('profiles').delete().eq('id', profile.id);
+        await fetchTeams();
+        await fetchAdmins();
+        await fetchProfiles();
+      } catch (error) {
+        console.error('Failed to delete user:', error);
+        alert('Failed to delete user. Check console for details.');
+      } finally {
+        setUploading(false);
+      }
+  };
+
   const handleDeleteTransaction = async (id) => {
       if (!myTeam) return;
       setTransactions(prev => prev.filter(t => t.id !== id));
@@ -1032,6 +1167,7 @@ const VentureTracker = ({ supabase, isMock }) => {
                   onCreateTeam={handleAdminCreateTeam}
                   onUpdateTeam={handleAdminUpdateTeam}
                   onCreateUser={handleCreateUser}
+                  onDeleteUser={handleDeleteUser}
                   onAssignCohort={handleAssignCohort}
                   supabase={supabase}
               />
@@ -1040,6 +1176,11 @@ const VentureTracker = ({ supabase, isMock }) => {
   }
 
   if (!myTeam) {
+    const activeCohorts = cohorts.filter(c => (c.status || 'active') === 'active');
+    const requestedCohort = cohorts.find(c => c.id === joinRequest?.cohort_id);
+    const myProfile = profiles.find(p => p.id === session.user.id);
+    const isApproved = joinRequest?.status === 'approved' || Boolean(myProfile?.cohort_id);
+    const isPending = joinRequest?.status === 'pending';
     return (
       <div className="min-h-screen bg-black flex flex-col text-white">
         <CountdownBanner targetDate={settings?.pitch_date} message={settings?.banner_message} />
@@ -1052,7 +1193,61 @@ const VentureTracker = ({ supabase, isMock }) => {
              Sign Out <LogOut className="w-4 h-4"/>
           </button>
         </header>
-        <CreateOrJoinTeam user={session.user} teams={allTeams} onJoin={handleJoinTeam} onCreate={handleCreateTeam} />
+        <div className="px-4 md:px-8 py-10 max-w-3xl mx-auto w-full">
+          {!isApproved && (
+            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 md:p-8 shadow-xl">
+              <h2 className="text-2xl font-bold text-white mb-2">Select Your Cohort</h2>
+              <p className="text-sm text-neutral-400 mb-6">
+                Choose the cohort you want to join. The admins will be alerted to approve and assign your team.
+              </p>
+              {joinRequest ? (
+                <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-4">
+                  <p className="text-sm text-neutral-300">
+                    Request submitted for{' '}
+                    <span className="text-yellow-500 font-semibold">
+                      {requestedCohort?.name || 'your cohort'}
+                    </span>.
+                  </p>
+                  <p className="text-xs text-neutral-500 mt-2">
+                    Status: <span className="uppercase font-bold text-yellow-500">{joinRequest.status || 'pending'}</span>
+                  </p>
+                  <p className="text-xs text-neutral-500 mt-3">
+                    You’ll be added to your cohort by the admins soon.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <select
+                    value={joinCohortId}
+                    onChange={(e) => setJoinCohortId(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-3 text-white outline-none focus:border-yellow-500"
+                  >
+                    <option value="">Select an active cohort...</option>
+                    {activeCohorts.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleSubmitJoinRequest}
+                    disabled={!joinCohortId || joinSubmitting}
+                    className="w-full bg-yellow-600 text-black font-bold py-3 rounded-lg hover:bg-yellow-500 disabled:opacity-50"
+                  >
+                    {joinSubmitting ? 'Submitting...' : 'Request Cohort Access'}
+                  </button>
+                  {activeCohorts.length === 0 && (
+                    <p className="text-xs text-neutral-500">No active cohorts are available right now.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {isApproved && (
+            <div className="mt-2">
+              <CreateOrJoinTeam user={session.user} teams={allTeams} onJoin={handleJoinTeam} onCreate={handleCreateTeam} />
+            </div>
+          )}
+        </div>
       </div>
     );
   }

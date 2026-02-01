@@ -43,7 +43,7 @@ const ReviewPanel = ({ teamId, taskId, currentStatus, submission, onReview }) =>
     )
 }
 
-const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], settings, cohortPhasesById = {}, onUpdateSettings, onAddAdmin, onRemoveAdmin, onUpdateProfile, onViewTeam, onDeleteTeam, onCreateTeam, onUpdateTeam, onAssignCohort, onCreateUser, uploading }) => {
+const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], settings, cohortPhasesById = {}, onUpdateSettings, onAddAdmin, onRemoveAdmin, onUpdateProfile, onViewTeam, onDeleteTeam, onCreateTeam, onUpdateTeam, onAssignCohort, onCreateUser, onDeleteUser, uploading }) => {
     const [tab, setTab] = useState('overview');
     const [bannerMsg, setBannerMsg] = useState(settings?.banner_message || '');
     const [pitchDate, setPitchDate] = useState(settings?.pitch_date || '');
@@ -68,7 +68,9 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     const [teamSort, setTeamSort] = useState('newest');
     const [teamCohortFilter, setTeamCohortFilter] = useState('');
     const [dragTask, setDragTask] = useState(null);
+    const [joinRequests, setJoinRequests] = useState([]);
     const adminCardClass = "w-full";
+    const adminFormClass = "w-full max-w-5xl mx-auto";
 
     const toLocalInputValue = (value) => {
         if (!value) return '';
@@ -109,6 +111,13 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     useEffect(() => {
         // Fetch cohorts when the component mounts or tab is switched to cohorts
         if (tab === 'teams' || tab === 'cohorts' || tab === 'milestones') {
+            fetchCohorts();
+        }
+    }, [tab, supabase]);
+
+    useEffect(() => {
+        if (tab === 'users') {
+            fetchJoinRequests();
             fetchCohorts();
         }
     }, [tab, supabase]);
@@ -217,6 +226,48 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     const fetchCohorts = async () => {
         const { data } = await supabase.from('cohorts').select('*').order('created_at', { ascending: false });
         if (data) setCohorts(data);
+    };
+
+    const fetchJoinRequests = async () => {
+        const { data, error } = await supabase
+            .from('cohort_join_requests')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) {
+            console.error('Error fetching join requests:', error);
+        } else {
+            setJoinRequests(data || []);
+        }
+    };
+
+    const handleApproveJoinRequest = async (request) => {
+        if (!request) return;
+        const { error } = await supabase
+            .from('cohort_join_requests')
+            .update({ status: 'approved' })
+            .eq('id', request.id);
+        if (error) {
+            alert('Failed to approve request: ' + error.message);
+            return;
+        }
+        await supabase
+            .from('profiles')
+            .update({ cohort_id: request.cohort_id })
+            .eq('id', request.user_id);
+        fetchJoinRequests();
+    };
+
+    const handleRejectJoinRequest = async (request) => {
+        if (!request) return;
+        const { error } = await supabase
+            .from('cohort_join_requests')
+            .update({ status: 'rejected' })
+            .eq('id', request.id);
+        if (error) {
+            alert('Failed to reject request: ' + error.message);
+            return;
+        }
+        fetchJoinRequests();
     };
 
     const handleCreateCohort = async () => {
@@ -595,60 +646,62 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                 <div className="space-y-8 w-full flex flex-col md:items-center">
                     <div className={`bg-neutral-900 p-6 rounded-xl border border-neutral-800 ${adminCardClass}`}>
                         <h3 className="text-lg font-bold text-white mb-4">Create New Cohort</h3>
-                        <div className="grid md:grid-cols-7 gap-3">
-                            <input 
-                                className="w-full md:col-span-2 bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white outline-none focus:border-yellow-500"
-                                placeholder="e.g., Fall 2024"
-                                value={newCohortName}
-                                onChange={(e) => setNewCohortName(e.target.value)}
-                            />
-                            <select
-                                value={newCohortStatus}
-                                onChange={(e) => setNewCohortStatus(e.target.value)}
-                                className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
-                            >
-                                <option value="active">Active</option>
-                                <option value="closed">Closed</option>
-                            </select>
-                            <input
-                                type="date"
-                                value={newCohortStart}
-                                onChange={(e) => setNewCohortStart(e.target.value)}
-                                className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
-                                aria-label="Start date"
-                            />
-                            <input
-                                type="date"
-                                value={newCohortEnd}
-                                onChange={(e) => setNewCohortEnd(e.target.value)}
-                                className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
-                                aria-label="End date"
-                            />
-                            <input
-                                type="date"
-                                value={newCohortPitchDate}
-                                onChange={(e) => setNewCohortPitchDate(e.target.value)}
-                                className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
-                                aria-label="Pitch date"
-                            />
-                            <button onClick={handleCreateCohort} disabled={!newCohortName.trim() || uploading} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 disabled:opacity-50">
-                                Create
-                            </button>
+                        <div className={adminFormClass}>
+                            <div className="grid md:grid-cols-7 gap-3">
+                                <input 
+                                    className="w-full md:col-span-2 bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white outline-none focus:border-yellow-500"
+                                    placeholder="e.g., Fall 2024"
+                                    value={newCohortName}
+                                    onChange={(e) => setNewCohortName(e.target.value)}
+                                />
+                                <select
+                                    value={newCohortStatus}
+                                    onChange={(e) => setNewCohortStatus(e.target.value)}
+                                    className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                                >
+                                    <option value="active">Active</option>
+                                    <option value="closed">Closed</option>
+                                </select>
+                                <input
+                                    type="date"
+                                    value={newCohortStart}
+                                    onChange={(e) => setNewCohortStart(e.target.value)}
+                                    className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                                    aria-label="Start date"
+                                />
+                                <input
+                                    type="date"
+                                    value={newCohortEnd}
+                                    onChange={(e) => setNewCohortEnd(e.target.value)}
+                                    className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                                    aria-label="End date"
+                                />
+                                <input
+                                    type="date"
+                                    value={newCohortPitchDate}
+                                    onChange={(e) => setNewCohortPitchDate(e.target.value)}
+                                    className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                                    aria-label="Pitch date"
+                                />
+                                <button onClick={handleCreateCohort} disabled={!newCohortName.trim() || uploading} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 disabled:opacity-50">
+                                    Create
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div className={`bg-neutral-900 p-6 rounded-xl border border-neutral-800 ${adminCardClass}`}>
                         <h3 className="text-lg font-bold text-white mb-4">Existing Cohorts</h3>
-                        <div className="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-neutral-700">
+                        <div className="space-y-4 max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-neutral-700">
                             {cohorts.length === 0 && <p className="text-sm text-neutral-500 italic">No cohorts created yet.</p>}
                             {cohorts.map(cohort => {
                                 const teamsInCohort = teams.filter(t => t.cohort_id === cohort.id);
                                 const canDelete = teamsInCohort.length === 0;
 
                                 return (
-                                    <div key={cohort.id} className="flex flex-col gap-3 bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+                                    <div key={cohort.id} className="flex flex-col gap-4 bg-neutral-950/70 p-4 md:p-5 rounded-xl border border-neutral-800 shadow-sm">
                                         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
                                           <div>
-                                            <p className="text-white font-medium">{cohort.name}</p>
+                                            <p className="text-yellow-500 font-semibold text-lg">{cohort.name}</p>
                                             <div className="flex items-center gap-3 mt-1">
                                                 <span className="text-xs text-neutral-500">{teamsInCohort.length} teams assigned</span>
                                                 <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full border ${
@@ -692,6 +745,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                             </button>
                                           </div>
                                         </div>
+                                        <div className="h-px bg-neutral-800/80" />
                                         <div className="mt-1">
                                           <label className="block text-[10px] text-neutral-500 uppercase mb-1">Cohort Banner Message (optional)</label>
                                           <div className="flex flex-col md:flex-row gap-2">
@@ -834,6 +888,54 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
 
             {tab === 'users' && (
                 <div className="space-y-6 w-full flex flex-col md:items-center">
+                    <div className={`bg-neutral-900 border border-neutral-800 rounded-xl p-5 ${adminCardClass}`}>
+                        <div className={adminFormClass}>
+                            <div className="flex items-center justify-between gap-4 mb-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-white">Pending Cohort Requests</h3>
+                                    <p className="text-xs text-neutral-500">Approve or reject new student requests.</p>
+                                </div>
+                                <button
+                                    onClick={fetchJoinRequests}
+                                    className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-2 rounded-md border border-neutral-700 transition"
+                                >
+                                    Refresh
+                                </button>
+                            </div>
+                            <div className="space-y-2">
+                                {joinRequests.filter(r => r.status === 'pending').length === 0 && (
+                                    <p className="text-xs text-neutral-500 italic">No pending requests.</p>
+                                )}
+                                {joinRequests.filter(r => r.status === 'pending').map(req => {
+                                    const cohort = cohorts.find(c => c.id === req.cohort_id);
+                                    return (
+                                        <div key={req.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-neutral-950 border border-neutral-800 rounded-lg p-3">
+                                            <div>
+                                                <p className="text-sm text-white font-semibold">{req.email || req.user_id}</p>
+                                                <p className="text-xs text-neutral-500">
+                                                    Cohort: <span className="text-yellow-500 font-semibold">{cohort?.name || req.cohort_id}</span>
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => handleApproveJoinRequest(req)}
+                                                    className="text-xs bg-green-800 hover:bg-green-700 text-green-100 px-3 py-2 rounded-md border border-green-900/40 transition"
+                                                >
+                                                    Approve
+                                                </button>
+                                                <button
+                                                    onClick={() => handleRejectJoinRequest(req)}
+                                                    className="text-xs bg-red-900/20 hover:bg-red-900/40 text-red-300 px-3 py-2 rounded-md border border-red-900/30 transition"
+                                                >
+                                                    Reject
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
                     <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                         <div>
                             <h3 className="text-xl font-bold text-white">User Directory</h3>
@@ -860,12 +962,12 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                             const userTeams = teams.filter(t => t.members?.includes(profile.id));
                             return (
                                 <div key={profile.id} className="bg-neutral-900 border border-neutral-800 rounded-xl p-4">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                            <p className="font-bold text-white">{profile.email}</p>
-                                            <div className="mt-1 flex items-center gap-2">
-                                                <span className={`px-2 py-1 text-xs font-bold rounded-full ${
-                                                    profile.role === 'admin' ? 'bg-yellow-900/30 text-yellow-400' :
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="font-bold text-white">{profile.email}</p>
+                                                <div className="mt-1 flex items-center gap-2">
+                                                    <span className={`px-2 py-1 text-xs font-bold rounded-full ${
+                                                        profile.role === 'admin' ? 'bg-yellow-900/30 text-yellow-400' :
                                                     profile.role === 'mentor' ? 'bg-blue-900/30 text-blue-400' :
                                                     'bg-neutral-800 text-neutral-300'
                                                 }`}>{profile.role}</span>
@@ -877,12 +979,18 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                                         className="rounded bg-neutral-800 border-neutral-700 text-yellow-600 focus:ring-yellow-600"
                                                     />
                                                     Admin
-                                                </label>
+                                                    </label>
+                                                </div>
                                             </div>
+                                            <button
+                                                onClick={() => onDeleteUser && onDeleteUser(profile)}
+                                                className="text-xs bg-red-900/20 hover:bg-red-900/40 text-red-400 px-3 py-2 rounded-md border border-red-900/30 transition"
+                                            >
+                                                Delete
+                                            </button>
                                         </div>
-                                    </div>
-                                    <div className="mt-3">
-                                        <p className="text-[10px] text-neutral-500 uppercase font-bold mb-2">Teams</p>
+                                        <div className="mt-3">
+                                            <p className="text-[10px] text-neutral-500 uppercase font-bold mb-2">Teams</p>
                                         <div className="flex flex-wrap gap-1">
                                             {userTeams.length > 0 ? userTeams.map(t => (
                                                 <span key={t.id} className="px-2 py-0.5 bg-neutral-800 rounded text-xs text-neutral-300 border border-neutral-700">{t.name}</span>
@@ -907,6 +1015,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                     <th className="p-4">Role</th>
                                     <th className="p-4">Teams</th>
                                     <th className="p-4">Admin</th>
+                                    <th className="p-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-neutral-800">
@@ -939,11 +1048,19 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                                     className="rounded bg-neutral-800 border-neutral-700 text-yellow-600 focus:ring-yellow-600"
                                                 />
                                             </td>
+                                            <td className="p-4">
+                                                <button
+                                                    onClick={() => onDeleteUser && onDeleteUser(profile)}
+                                                    className="text-xs bg-red-900/20 hover:bg-red-900/40 text-red-400 px-3 py-2 rounded-md border border-red-900/30 transition"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </td>
                                         </tr>
                                     );
                                 })}
                                 {filteredProfiles.length === 0 && (
-                                    <tr><td colSpan="5" className="p-8 text-center text-neutral-600 italic">No users found.</td></tr>
+                                    <tr><td colSpan="6" className="p-8 text-center text-neutral-600 italic">No users found.</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -959,14 +1076,16 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
 
                     <div className="mb-6">
                         <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Select Cohort</label>
-                        <select
-                            value={selectedMilestoneCohort}
-                            onChange={(e) => setSelectedMilestoneCohort(e.target.value)}
-                            className="w-full md:w-1/2 bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white outline-none focus:border-yellow-500"
-                        >
-                            <option value="">-- Choose a cohort --</option>
-                            {cohorts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
+                        <div className="w-full max-w-xl">
+                            <select
+                                value={selectedMilestoneCohort}
+                                onChange={(e) => setSelectedMilestoneCohort(e.target.value)}
+                                className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white outline-none focus:border-yellow-500"
+                            >
+                                <option value="">-- Choose a cohort --</option>
+                                {cohorts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
                     </div>
 
                     {selectedMilestoneCohort && (
@@ -1032,24 +1151,26 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                 <div className="w-full flex flex-col md:items-center">
                   <div className={`bg-neutral-900 p-6 md:p-8 rounded-xl border border-neutral-800 ${adminCardClass}`}>
                     <h3 className="text-xl font-bold text-white mb-6">Global Settings</h3>
-                    <div className="space-y-6">
-                        <div>
-                            <label className="block text-sm font-medium text-neutral-400 mb-2">Banner Message</label>
-                            <input className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white focus:border-yellow-500 outline-none" value={bannerMsg} onChange={e => setBannerMsg(e.target.value)} />
+                    <div className={adminFormClass}>
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium text-neutral-400 mb-2">Banner Message</label>
+                                <input className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white focus:border-yellow-500 outline-none" value={bannerMsg} onChange={e => setBannerMsg(e.target.value)} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-neutral-400 mb-2">Pitch Date</label>
+                                <input
+                                    type="datetime-local"
+                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white focus:border-yellow-500 outline-none"
+                                    value={toLocalInputValue(pitchDate)}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setPitchDate(value ? new Date(value).toISOString() : '');
+                                    }}
+                                />
+                            </div>
+                            <button onClick={saveSettings} disabled={uploading} className="bg-yellow-600 text-black font-bold px-6 py-2 rounded-lg hover:bg-yellow-500 disabled:opacity-50">{uploading ? 'Saving...' : 'Save Settings'}</button>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-neutral-400 mb-2">Pitch Date</label>
-                            <input
-                                type="datetime-local"
-                                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white focus:border-yellow-500 outline-none"
-                                value={toLocalInputValue(pitchDate)}
-                                onChange={(e) => {
-                                    const value = e.target.value;
-                                    setPitchDate(value ? new Date(value).toISOString() : '');
-                                }}
-                            />
-                        </div>
-                        <button onClick={saveSettings} disabled={uploading} className="bg-yellow-600 text-black font-bold px-6 py-2 rounded-lg hover:bg-yellow-500 disabled:opacity-50">{uploading ? 'Saving...' : 'Save Settings'}</button>
                     </div>
                   </div>
                 </div>
