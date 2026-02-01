@@ -963,6 +963,7 @@ const VentureTracker = ({ supabase, isMock }) => {
   if (view === 'admin-dashboard' && isAuthorizedAdmin) {
       return (
           <div className="min-h-screen bg-black flex flex-col">
+              <CountdownBanner targetDate={settings?.pitch_date} message={bannerMessage} />
               <header className="bg-neutral-900 border-b border-neutral-800 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
                   <div className="flex items-center gap-2">
                       <Rocket className="w-6 h-6 text-yellow-500" />
