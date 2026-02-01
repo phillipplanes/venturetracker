@@ -765,7 +765,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             )}
 
             {tab === 'settings' && (
-                <div className="bg-neutral-900 p-8 rounded-xl border border-neutral-800 max-w-2xl">
+                <div className="bg-neutral-900 p-6 md:p-8 rounded-xl border border-neutral-800 w-full md:max-w-2xl">
                     <h3 className="text-xl font-bold text-white mb-6">Global Settings</h3>
                     <div className="space-y-6">
                         <div>
