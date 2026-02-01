@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Camera } from 'lucide-react';
 
-const TeamProfileModal = ({ team, uploading, onCancel, onSave }) => {
+const TeamProfileModal = ({ team, uploading, onCancel, onSave, tags = [], selectedTagIds = [], onSaveTags }) => {
   const [description, setDescription] = useState(team?.description || '');
   const [logoFile, setLogoFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
+  const [tagIds, setTagIds] = useState(selectedTagIds);
 
   useEffect(() => {
     if (!logoFile) {
@@ -16,9 +17,13 @@ const TeamProfileModal = ({ team, uploading, onCancel, onSave }) => {
     return () => URL.revokeObjectURL(url);
   }, [logoFile]);
 
+  useEffect(() => {
+    setTagIds(selectedTagIds);
+  }, [selectedTagIds]);
+
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 w-full max-w-md shadow-2xl">
+      <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 w-full max-w-lg shadow-2xl">
         <h3 className="text-lg font-bold text-white mb-4">Edit Team Profile</h3>
 
         <div className="space-y-4">
@@ -58,6 +63,34 @@ const TeamProfileModal = ({ team, uploading, onCancel, onSave }) => {
               placeholder="A one-liner about the venture."
             />
           </div>
+          <div>
+            <label className="block text-xs font-bold text-neutral-500 uppercase mb-2">Project Tags</label>
+            {tags.length === 0 ? (
+              <p className="text-xs text-neutral-500">No tags available yet.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {tags.map(tag => {
+                  const checked = tagIds.includes(tag.id);
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => {
+                        setTagIds(prev => checked ? prev.filter(id => id !== tag.id) : [...prev, tag.id]);
+                      }}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition ${
+                        checked
+                          ? 'bg-yellow-900/30 text-yellow-300 border-yellow-700/50'
+                          : 'bg-neutral-900 text-neutral-400 border-neutral-700 hover:border-yellow-600/50 hover:text-yellow-200'
+                      }`}
+                    >
+                      {tag.label || tag.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex justify-end gap-3 mt-6">
@@ -65,7 +98,10 @@ const TeamProfileModal = ({ team, uploading, onCancel, onSave }) => {
             Cancel
           </button>
           <button
-            onClick={() => onSave({ description, logoFile })}
+            onClick={() => {
+              onSave({ description, logoFile });
+              if (onSaveTags) onSaveTags(tagIds);
+            }}
             disabled={uploading || !description.trim()}
             className="bg-yellow-600 text-black px-4 py-2 rounded-lg text-sm font-bold hover:bg-yellow-500 disabled:opacity-50"
           >

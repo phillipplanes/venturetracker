@@ -328,6 +328,8 @@ const VentureTracker = ({ supabase, isMock }) => {
   const [phases, setPhases] = useState([]);
   const [cohortPhasesById, setCohortPhasesById] = useState({});
   const [cohorts, setCohorts] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [teamTagIds, setTeamTagIds] = useState([]);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   
   const [view, setView] = useState('dashboard'); // 'dashboard', 'all-teams', 'finances', 'team-summary'
@@ -366,6 +368,7 @@ const VentureTracker = ({ supabase, isMock }) => {
     fetchAdmins();
     fetchProfiles();
     fetchCohorts();
+    fetchTags();
 
     // Set up Realtime Subscription for Teams
     const teamsSub = supabase.channel('public:teams')
@@ -406,6 +409,7 @@ const VentureTracker = ({ supabase, isMock }) => {
       
       // Also fetch the submissions for this team
       const { data: submissionsData } = await supabase.from('team_submissions').select('*').eq('team_id', team.id);
+      fetchTeamTags(team.id);
       
       if (submissionsData) {
           setAllTeams(prev => prev.map(t => t.id === team.id ? { ...t, team_submissions: submissionsData } : t));
@@ -504,6 +508,16 @@ const VentureTracker = ({ supabase, isMock }) => {
   const fetchProfiles = async () => {
       const { data } = await supabase.from('profiles').select('*');
       if (data) setProfiles(data);
+  };
+
+  const fetchTags = async () => {
+      const { data } = await supabase.from('tags').select('*').order('name', { ascending: true });
+      if (data) setTags(data);
+  };
+
+  const fetchTeamTags = async (teamId) => {
+      const { data } = await supabase.from('team_tags').select('tag_id').eq('team_id', teamId);
+      if (data) setTeamTagIds(data.map(row => row.tag_id));
   };
 
   // 3. Fetch Updates & Transactions based on current view/team context
@@ -863,6 +877,28 @@ const VentureTracker = ({ supabase, isMock }) => {
           setViewingTeam(prev => (prev && prev.id === myTeam.id ? { ...prev, ...nextTeam } : prev));
           setIsEditingProfile(false);
       }
+      setUploading(false);
+  };
+
+  const handleSaveTeamTags = async (nextTagIds) => {
+      if (!myTeam) return;
+      setUploading(true);
+      const { error: deleteError } = await supabase.from('team_tags').delete().eq('team_id', myTeam.id);
+      if (deleteError) {
+          console.error("Error clearing team tags:", deleteError);
+          setUploading(false);
+          return;
+      }
+      if (nextTagIds.length > 0) {
+          const rows = nextTagIds.map(tag_id => ({ team_id: myTeam.id, tag_id }));
+          const { error: insertError } = await supabase.from('team_tags').insert(rows);
+          if (insertError) {
+              console.error("Error saving team tags:", insertError);
+              setUploading(false);
+              return;
+          }
+      }
+      setTeamTagIds(nextTagIds);
       setUploading(false);
   };
 
@@ -1236,8 +1272,11 @@ const VentureTracker = ({ supabase, isMock }) => {
         <TeamProfileModal
           team={myTeam}
           uploading={uploading}
+          tags={tags}
+          selectedTagIds={teamTagIds}
           onCancel={() => setIsEditingProfile(false)}
           onSave={handleUpdateTeamProfile}
+          onSaveTags={handleSaveTeamTags}
         />
       )}
     </div>
