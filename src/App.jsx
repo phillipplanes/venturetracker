@@ -1001,11 +1001,16 @@ const VentureTracker = ({ supabase, isMock }) => {
     const cohort = cohorts.find(c => c.id === teamForBanner?.cohort_id);
     return cohort?.banner_message || settings?.banner_message;
   };
+  const getPitchDate = () => {
+    const teamForBanner = view === 'team-summary' ? viewingTeam : myTeam;
+    const cohort = cohorts.find(c => c.id === teamForBanner?.cohort_id);
+    return cohort?.pitch_date || settings?.pitch_date;
+  };
 
   if (view === 'admin-dashboard' && isAuthorizedAdmin) {
       return (
           <div className="min-h-screen bg-black flex flex-col">
-              <CountdownBanner targetDate={settings?.pitch_date} message={getBannerMessage()} />
+              <CountdownBanner targetDate={getPitchDate()} message={getBannerMessage()} />
               <header className="bg-neutral-900 border-b border-neutral-800 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
                   <div className="flex items-center gap-2">
                       <Rocket className="w-6 h-6 text-yellow-500" />
@@ -1077,7 +1082,7 @@ const VentureTracker = ({ supabase, isMock }) => {
             Demo Mode (Data is not saved)
           </div>
       )}
-      <CountdownBanner targetDate={settings?.pitch_date} message={getBannerMessage()} />
+      <CountdownBanner targetDate={getPitchDate()} message={getBannerMessage()} />
       {/* Mobile Top Bar */}
       <div className="md:hidden bg-neutral-950 border-b border-neutral-800 px-4 py-3 flex items-center justify-between sticky top-0 z-20 w-full">
         <button

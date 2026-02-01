@@ -57,6 +57,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     const [newCohortStatus, setNewCohortStatus] = useState('active');
     const [newCohortStart, setNewCohortStart] = useState('');
     const [newCohortEnd, setNewCohortEnd] = useState('');
+    const [newCohortPitchDate, setNewCohortPitchDate] = useState('');
     const [selectedMilestoneCohort, setSelectedMilestoneCohort] = useState('');
     const [copying, setCopying] = useState(false);
     const [editingTeam, setEditingTeam] = useState(null);
@@ -188,13 +189,15 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             name: newCohortName,
             status: newCohortStatus,
             start_date: newCohortStart || null,
-            end_date: newCohortEnd || null
+            end_date: newCohortEnd || null,
+            pitch_date: newCohortPitchDate || null
         }]);
         if (!error) {
             setNewCohortName('');
             setNewCohortStatus('active');
             setNewCohortStart('');
             setNewCohortEnd('');
+            setNewCohortPitchDate('');
             fetchCohorts();
         } else {
             alert("Failed to create cohort: " + error.message);
@@ -489,7 +492,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                 <div className="space-y-8 w-full flex flex-col md:items-center">
                     <div className={`bg-neutral-900 p-6 rounded-xl border border-neutral-800 ${adminCardClass}`}>
                         <h3 className="text-lg font-bold text-white mb-4">Create New Cohort</h3>
-                        <div className="grid md:grid-cols-6 gap-3">
+                        <div className="grid md:grid-cols-7 gap-3">
                             <input 
                                 className="w-full md:col-span-2 bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-white outline-none focus:border-yellow-500"
                                 placeholder="e.g., Fall 2024"
@@ -514,6 +517,12 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                 type="date"
                                 value={newCohortEnd}
                                 onChange={(e) => setNewCohortEnd(e.target.value)}
+                                className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
+                            />
+                            <input
+                                type="date"
+                                value={newCohortPitchDate}
+                                onChange={(e) => setNewCohortPitchDate(e.target.value)}
                                 className="md:col-span-1 bg-neutral-950 border border-neutral-700 text-neutral-300 rounded-lg px-3 py-2 focus:ring-yellow-500 focus:border-yellow-500"
                             />
                             <button onClick={handleCreateCohort} disabled={!newCohortName.trim() || uploading} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 disabled:opacity-50">
@@ -636,12 +645,23 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                               }}
                                               className="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-xs text-neutral-200 outline-none focus:border-yellow-500"
                                             />
+                                            <input
+                                              type="date"
+                                              value={cohort.pitch_date || ''}
+                                              onChange={(e) => {
+                                                const next = e.target.value;
+                                                setCohorts(prev => prev.map(c => c.id === cohort.id ? { ...c, pitch_date: next } : c));
+                                                setDateStatus(prev => ({ ...prev, [cohort.id]: '' }));
+                                              }}
+                                              className="bg-neutral-900 border border-neutral-700 rounded-md px-3 py-2 text-xs text-neutral-200 outline-none focus:border-yellow-500"
+                                            />
                                             <button
                                               onClick={async () => {
                                                 setDateStatus(prev => ({ ...prev, [cohort.id]: 'saving' }));
                                                 const { error } = await supabase.from('cohorts').update({
                                                   start_date: cohort.start_date || null,
-                                                  end_date: cohort.end_date || null
+                                                  end_date: cohort.end_date || null,
+                                                  pitch_date: cohort.pitch_date || null
                                                 }).eq('id', cohort.id);
                                                 if (error) {
                                                   setDateStatus(prev => ({ ...prev, [cohort.id]: 'error' }));
@@ -660,6 +680,32 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                           {dateStatus[cohort.id] === 'error' && (
                                             <p className="text-[10px] text-red-400 mt-1">Date save failed</p>
                                           )}
+                                        </div>
+                                        <div className="mt-3">
+                                          <label className="block text-[10px] text-neutral-500 uppercase mb-2">Teams in Cohort</label>
+                                          <div className="space-y-2">
+                                            {teams.filter(t => t.cohort_id === cohort.id).map(team => {
+                                              const phases = cohortPhasesById[cohort.id] || [];
+                                              const taskIdSet = new Set(phases.flatMap(p => (p.tasks || []).map(t => t.id)));
+                                              const submissions = (team.team_submissions || []).reduce((acc, sub) => {
+                                                acc[sub.task_id] = sub;
+                                                return acc;
+                                              }, {});
+                                              const approvedCount = Object.values(submissions).filter(s => taskIdSet.has(s.task_id) && s.status === 'approved').length;
+                                              const totalTasks = taskIdSet.size;
+                                              const progress = totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
+
+                                              return (
+                                                <div key={team.id} className="flex items-center justify-between bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2">
+                                                  <span className="text-xs text-neutral-200 truncate">{team.name}</span>
+                                                  <span className="text-xs text-yellow-400 font-bold">{progress}%</span>
+                                                </div>
+                                              );
+                                            })}
+                                            {teams.filter(t => t.cohort_id === cohort.id).length === 0 && (
+                                              <p className="text-xs text-neutral-500 italic">No teams assigned.</p>
+                                            )}
+                                          </div>
                                         </div>
                                     </div>
                                 );
