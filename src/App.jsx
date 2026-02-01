@@ -1030,7 +1030,7 @@ const VentureTracker = ({ supabase, isMock }) => {
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-black text-white">
+    <div className="flex flex-col h-screen overflow-hidden bg-black text-white overflow-x-hidden">
       {isMock && (
           <div className="bg-yellow-600 text-black text-center py-1 text-xs font-bold uppercase tracking-widest z-50">
             Demo Mode (Data is not saved)
@@ -1134,7 +1134,7 @@ const VentureTracker = ({ supabase, isMock }) => {
                 </div>
             </header>
             
-            <div className="p-8 max-w-6xl mx-auto">
+            <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto">
             
             {/* Dashboard (My Team) */}
             {view === 'dashboard' && (

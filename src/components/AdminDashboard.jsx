@@ -585,6 +585,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                     </div>
                     
                     <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
+                        <div className="w-full overflow-x-auto">
                         <table className="w-full text-left text-sm text-neutral-400">
                             <thead className="bg-neutral-950 text-neutral-500 uppercase text-xs font-bold">
                                 <tr>
@@ -632,6 +633,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                 )}
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 </div>
             )}
