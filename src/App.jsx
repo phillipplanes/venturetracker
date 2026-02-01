@@ -960,6 +960,10 @@ const VentureTracker = ({ supabase, isMock }) => {
   const isRoot = session?.user?.email === ROOT_ADMIN_EMAIL;
   const isAuthorizedAdmin = isRoot || adminList.some(a => a.email === session?.user?.email);
 
+  const currentDisplayTeam = view === 'team-summary' ? viewingTeam : myTeam;
+  const currentCohort = cohorts.find(c => c.id === currentDisplayTeam?.cohort_id);
+  const bannerMessage = currentCohort?.banner_message || settings?.banner_message;
+
   if (view === 'admin-dashboard' && isAuthorizedAdmin) {
       return (
           <div className="min-h-screen bg-black flex flex-col">
@@ -1011,9 +1015,6 @@ const VentureTracker = ({ supabase, isMock }) => {
   }
 
   // Header Logic
-  const currentDisplayTeam = view === 'team-summary' ? viewingTeam : myTeam;
-  const currentCohort = cohorts.find(c => c.id === currentDisplayTeam?.cohort_id);
-  const bannerMessage = currentCohort?.banner_message || settings?.banner_message;
   const submissions = currentDisplayTeam?.team_submissions
     ? currentDisplayTeam.team_submissions.reduce((acc, sub) => {
         acc[sub.task_id] = sub;
