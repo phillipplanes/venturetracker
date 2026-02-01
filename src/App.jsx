@@ -973,24 +973,20 @@ const VentureTracker = ({ supabase, isMock }) => {
                       <button onClick={() => supabase.auth.signOut()} className="text-sm text-neutral-400 hover:text-white flex items-center gap-2">Sign Out <LogOut className="w-4 h-4"/></button>
                   </div>
               </header>
-              <div className="overflow-x-auto">
-                <div className="min-w-[900px]">
-                  <AdminDashboard 
-                      teams={allTeams} admins={adminList} profiles={profiles} settings={settings}
-                      cohortPhasesById={cohortPhasesById}
-                      onUpdateSettings={handleUpdateSettings}
-                      onUpdateProfile={handleUpdateProfile}
-                      onAddAdmin={handleAddAdmin} onRemoveAdmin={handleRemoveAdmin}
-                      onViewTeam={handleAdminViewTeam} onDeleteTeam={handleDeleteTeam}
-                      uploading={uploading}
-                      onCreateTeam={handleAdminCreateTeam}
-                      onUpdateTeam={handleAdminUpdateTeam}
-                      onCreateUser={handleCreateUser}
-                      onAssignCohort={handleAssignCohort}
-                      supabase={supabase}
-                  />
-                </div>
-              </div>
+              <AdminDashboard 
+                  teams={allTeams} admins={adminList} profiles={profiles} settings={settings}
+                  cohortPhasesById={cohortPhasesById}
+                  onUpdateSettings={handleUpdateSettings}
+                  onUpdateProfile={handleUpdateProfile}
+                  onAddAdmin={handleAddAdmin} onRemoveAdmin={handleRemoveAdmin}
+                  onViewTeam={handleAdminViewTeam} onDeleteTeam={handleDeleteTeam}
+                  uploading={uploading}
+                  onCreateTeam={handleAdminCreateTeam}
+                  onUpdateTeam={handleAdminUpdateTeam}
+                  onCreateUser={handleCreateUser}
+                  onAssignCohort={handleAssignCohort}
+                  supabase={supabase}
+              />
           </div>
       );
   }

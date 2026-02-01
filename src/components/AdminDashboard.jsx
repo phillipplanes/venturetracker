@@ -284,9 +284,9 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                 Admin Dashboard
             </h1>
 
-            <div className="flex gap-4 border-b border-neutral-800 mb-8">
+            <div className="flex gap-4 border-b border-neutral-800 mb-8 overflow-x-auto">
                 {['overview', 'teams', 'users', 'cohorts', 'milestones', 'settings'].map(t => (
-                    <button key={t} onClick={() => setTab(t)} className={`pb-3 px-2 text-sm font-bold uppercase tracking-wider transition ${tab === t ? 'text-yellow-500 border-b-2 border-yellow-500' : 'text-neutral-500 hover:text-white'}`}>
+                    <button key={t} onClick={() => setTab(t)} className={`pb-3 px-2 text-sm font-bold uppercase tracking-wider transition whitespace-nowrap ${tab === t ? 'text-yellow-500 border-b-2 border-yellow-500' : 'text-neutral-500 hover:text-white'}`}>
                         {t}
                     </button>
                 ))}
@@ -347,7 +347,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
 
                                 return (
                                     <div key={team.id} className="p-4 hover:bg-neutral-800/40 transition">
-                                        <div className="flex items-center justify-between gap-4">
+                                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                                             <div className="flex items-center gap-4 min-w-0">
                                                 <TeamLogo url={team.logo_display_url || team.logo_url} name={team.name} className="w-12 h-12 rounded-lg" iconSize="w-5 h-5" />
                                                 <div className="min-w-0">
@@ -389,7 +389,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-4 md:justify-end">
                                                 <div className="text-right">
                                                     <div className="text-2xl font-bold text-yellow-500">{progress}%</div>
                                                     <p className="text-[10px] text-neutral-500">Complete</p>
@@ -414,15 +414,15 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
             )}
 
             {tab === 'teams' && (
-                <div className="space-y-4">
-                    <div className="flex justify-end">
-                        <button onClick={() => setEditingTeam({ name: '', description: '' })} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 text-sm flex items-center gap-2">
-                            <Plus className="w-4 h-4" />
-                            Create New Team
-                        </button>
-                    </div>
-                    {teams.map(team => (
-                        <div key={team.id} className="bg-neutral-900 p-4 rounded-lg border border-neutral-800 flex justify-between items-center">
+                    <div className="space-y-4">
+                        <div className="flex justify-end">
+                            <button onClick={() => setEditingTeam({ name: '', description: '' })} className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500 text-sm flex items-center gap-2">
+                                <Plus className="w-4 h-4" />
+                                Create New Team
+                            </button>
+                        </div>
+                        {teams.map(team => (
+                        <div key={team.id} className="bg-neutral-900 p-4 rounded-lg border border-neutral-800 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                             <div className="flex items-center gap-4">
                                 <TeamLogo url={team.logo_display_url || team.logo_url} name={team.name} />
                                 <div>
@@ -430,7 +430,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                     <p className="text-xs text-neutral-500">{team.members?.length || 0} members</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <select
                                     value={team.cohort_id || ''}
                                     onChange={(e) => onAssignCohort(team.id, e.target.value)}
