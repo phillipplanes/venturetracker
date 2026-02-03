@@ -122,7 +122,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     }, [tab, supabase]);
 
     useEffect(() => {
-        if (tab === 'teams') {
+        if (tab === 'teams' || tab === 'overview') {
             fetchTeamUpdates();
         }
     }, [tab, teams.length, supabase]);
@@ -498,91 +498,85 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                         </div>
                     </div>
 
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
-                        <div className="p-4 border-b border-neutral-800 bg-neutral-950/50">
-                            <h3 className="font-bold text-white">Team Overview</h3>
-                            <p className="text-xs text-neutral-500 mt-1">Progress, pending approvals, and quick access.</p>
-                        </div>
-                        <div className="divide-y divide-neutral-800">
-                            {teams.map(team => {
-                                const phases = cohortPhasesById[team.cohort_id] || [];
-                                const taskIdSet = new Set(phases.flatMap(p => (p.tasks || []).map(t => t.id)));
-                                const totalTasks = taskIdSet.size;
-                                const submissions = (team.team_submissions || []).reduce((acc, sub) => {
-                                    acc[sub.task_id] = sub;
-                                    return acc;
-                                }, {});
-                                const approvedCount = Object.values(submissions).filter(s => taskIdSet.has(s.task_id) && s.status === 'approved').length;
-                                const pendingCount = Object.values(submissions).filter(s => taskIdSet.has(s.task_id) && s.status === 'pending').length;
-                                const progress = totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
-                                const pendingTasks = Object.values(submissions).filter(s => taskIdSet.has(s.task_id) && s.status === 'pending').slice(0, 3);
-                                const memberProfiles = (team.members || [])
-                                    .map(id => profiles.find(p => p.id === id))
-                                    .filter(Boolean);
-
+                    <div className="grid lg:grid-cols-3 gap-4">
+                        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-5">
+                            <h3 className="text-base font-bold text-white mb-3">Progress Overview</h3>
+                            {(() => {
+                                const buckets = { '0-25%': 0, '26-50%': 0, '51-75%': 0, '76-100%': 0 };
+                                teams.forEach(team => {
+                                    const phases = cohortPhasesById[team.cohort_id] || [];
+                                    const taskIdSet = new Set(phases.flatMap(p => (p.tasks || []).map(t => t.id)));
+                                    const totalTasks = taskIdSet.size;
+                                    const submissions = (team.team_submissions || []).reduce((acc, sub) => {
+                                        acc[sub.task_id] = sub;
+                                        return acc;
+                                    }, {});
+                                    const approvedCount = Object.values(submissions).filter(s => taskIdSet.has(s.task_id) && s.status === 'approved').length;
+                                    const progress = totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
+                                    if (progress <= 25) buckets['0-25%'] += 1;
+                                    else if (progress <= 50) buckets['26-50%'] += 1;
+                                    else if (progress <= 75) buckets['51-75%'] += 1;
+                                    else buckets['76-100%'] += 1;
+                                });
                                 return (
-                                    <div key={team.id} className="p-4 hover:bg-neutral-800/40 transition">
-                                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                                            <div className="flex items-center gap-4 min-w-0">
-                                                <TeamLogo url={team.logo_display_url || team.logo_url} name={team.name} className="w-12 h-12 rounded-lg" iconSize="w-5 h-5" />
-                                                <div className="min-w-0">
-                                                    <div className="flex items-center gap-3 flex-wrap">
-                                                        <h4 className="font-bold text-white truncate">{team.name}</h4>
-                                                        <span className="text-[10px] uppercase font-bold px-2 py-1 rounded-full bg-neutral-800 text-neutral-300 border border-neutral-700">
-                                                            {team.members?.length || 0} members
-                                                        </span>
-                                                        <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full border ${
-                                                            pendingCount > 0 ? 'bg-yellow-900/30 text-yellow-400 border-yellow-700/50' : 'bg-neutral-800 text-neutral-400 border-neutral-700'
-                                                        }`}>
-                                                            {pendingCount} pending approvals
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-sm text-neutral-400 line-clamp-1">{team.description || 'No description yet.'}</p>
-                                                    {memberProfiles.length > 0 && (
-                                                        <div className="mt-2 flex flex-wrap gap-2">
-                                                            {memberProfiles.slice(0, 6).map((m) => (
-                                                                <span key={m.id} className="text-[10px] text-neutral-300 bg-neutral-800 border border-neutral-700 px-2 py-1 rounded-full">
-                                                                    {m.email || m.full_name || m.id}
-                                                                </span>
-                                                            ))}
-                                                            {memberProfiles.length > 6 && (
-                                                                <span className="text-[10px] text-neutral-500">+{memberProfiles.length - 6} more</span>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                    {pendingTasks.length > 0 && (
-                                                        <div className="mt-2 flex flex-wrap gap-2">
-                                                            {pendingTasks.map((p, i) => (
-                                                                <span key={i} className="text-[10px] text-yellow-300 bg-yellow-900/20 border border-yellow-800/50 px-2 py-1 rounded-full">
-                                                                    {p.summary ? `${p.summary.slice(0, 48)}${p.summary.length > 48 ? '…' : ''}` : 'Pending task'}
-                                                                </span>
-                                                            ))}
-                                                            {pendingCount > 3 && (
-                                                                <span className="text-[10px] text-neutral-500">+{pendingCount - 3} more</span>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
+                                    <div className="space-y-2">
+                                        {Object.entries(buckets).map(([label, count]) => (
+                                            <div key={label} className="flex items-center justify-between text-sm text-neutral-400">
+                                                <span>{label}</span>
+                                                <span className="text-yellow-400 font-bold">{count}</span>
                                             </div>
-                                            <div className="flex items-center gap-4 md:justify-end">
-                                                <div className="text-right">
-                                                    <div className="text-2xl font-bold text-yellow-500">{progress}%</div>
-                                                    <p className="text-[10px] text-neutral-500">Complete</p>
-                                                </div>
-                                                <button onClick={() => onViewTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition">
-                                                    View
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div className="mt-3 w-full bg-neutral-800 h-2 rounded-full overflow-hidden">
-                                            <div className="bg-yellow-500 h-full rounded-full" style={{ width: `${progress}%` }} />
-                                        </div>
+                                        ))}
                                     </div>
                                 );
-                            })}
-                            {teams.length === 0 && (
-                                <div className="p-8 text-center text-neutral-600 italic">No teams yet.</div>
-                            )}
+                            })()}
+                        </div>
+                        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-5">
+                            <h3 className="text-base font-bold text-white mb-3">Teams Needing Attention</h3>
+                            {(() => {
+                                const staleCutoff = Date.now() - 1000 * 60 * 60 * 24 * 14;
+                                const staleTeams = teams.filter(team => {
+                                    const updates = teamUpdatesById[team.id] || [];
+                                    const latest = updates[0]?.created_at ? new Date(updates[0].created_at).getTime() : 0;
+                                    return updates.length === 0 || latest < staleCutoff;
+                                }).slice(0, 6);
+                                return staleTeams.length === 0 ? (
+                                    <p className="text-sm text-neutral-500">No stale updates.</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {staleTeams.map(team => (
+                                            <div key={team.id} className="flex items-center justify-between text-sm text-neutral-400">
+                                                <span className="truncate">{team.name}</span>
+                                                <span className="text-red-400">No recent updates</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-5">
+                            <h3 className="text-base font-bold text-white mb-3">Pending Reviews</h3>
+                            {(() => {
+                                const pending = teams.flatMap(team => (team.team_submissions || [])
+                                    .filter(s => s.status === 'pending')
+                                    .map(s => ({ team, submission: s }))
+                                ).slice(0, 6);
+                                return pending.length === 0 ? (
+                                    <p className="text-sm text-neutral-500">No pending reviews.</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {pending.map((item, idx) => (
+                                            <button
+                                                key={`${item.team.id}-${idx}`}
+                                                onClick={() => onViewTeam(item.team)}
+                                                className="w-full flex items-center justify-between text-sm text-neutral-400 hover:text-white"
+                                            >
+                                                <span className="truncate">{item.team.name}</span>
+                                                <span className="text-yellow-400">Pending</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>
@@ -654,10 +648,10 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                         <div key={team.id} className="bg-neutral-900 p-4 rounded-lg border border-neutral-800 flex flex-col gap-4">
                                             <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                                                 <div className="flex items-start gap-4 min-w-0">
-                                                    <TeamLogo url={team.logo_display_url || team.logo_url} name={team.name} />
+                                                    <TeamLogo url={team.logo_display_url || team.logo_url} name={team.name} fit="contain" className="w-12 h-12 rounded-lg bg-neutral-950 border border-neutral-800" />
                                                     <div className="min-w-0">
                                                         <h4 className="font-bold text-white">{team.name}</h4>
-                                                    <p className="text-xs text-neutral-500 line-clamp-2">{team.description || 'No description'}</p>
+                                                        <p className="text-xs text-neutral-500 line-clamp-2">{team.description || 'No description'}</p>
                                                     {(teamTagsByTeam[team.id] || []).length > 0 && (
                                                         <div className="mt-2 flex flex-wrap gap-1">
                                                             {teamTagsByTeam[team.id].map((tag, idx) => (
@@ -678,37 +672,39 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                <select
-                                                    value={team.cohort_id || ''}
-                                                    onChange={(e) => onAssignCohort(team.id, e.target.value)}
-                                                    disabled={!canEdit}
-                                                    className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs rounded-md px-2 py-2 focus:ring-yellow-500 focus:border-yellow-500 disabled:opacity-50"
-                                                >
+                                                <div className="flex flex-col items-start md:items-end gap-2">
+                                                    <select
+                                                        value={team.cohort_id || ''}
+                                                        onChange={(e) => onAssignCohort(team.id, e.target.value)}
+                                                        disabled={!canEdit}
+                                                        className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs rounded-md px-2 py-2 focus:ring-yellow-500 focus:border-yellow-500 disabled:opacity-50"
+                                                    >
                                                         <option value="">Assign Cohort...</option>
                                                         {cohorts.map(c => (
                                                             <option key={c.id} value={c.id}>{c.name}</option>
                                                         ))}
                                                     </select>
-                                                    <button onClick={() => setEditingTeam(team)} disabled={!canEdit} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition flex items-center gap-1 disabled:opacity-50">
-                                                        <Edit2 className="w-3 h-3" /> Edit
-                                                    </button>
-                                                    <button onClick={() => onViewTeam(team)} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition">
-                                                        View Dashboard
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => setTeamToDelete(team)} 
-                                                        disabled={!canDelete}
-                                                        className="text-xs bg-red-900/20 hover:bg-red-900/40 text-red-400 px-3 py-2 rounded-md border border-red-900/30 transition flex items-center gap-1 disabled:opacity-50"
-                                                    >
-                                                        <Trash2 className="w-3 h-3" /> Delete
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setTeamDetailsOpen(prev => ({ ...prev, [team.id]: !prev[team.id] }))}
-                                                        className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-2 rounded-md border border-neutral-700 transition"
-                                                    >
-                                                        {isExpanded ? 'Hide Updates' : 'Show Updates'}
-                                                    </button>
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <button onClick={() => onViewTeam(team)} className="text-sm bg-yellow-600 hover:bg-yellow-500 text-black px-4 py-2 rounded-md font-bold border border-yellow-500/50 transition">
+                                                            View
+                                                        </button>
+                                                        <button onClick={() => setEditingTeam(team)} disabled={!canEdit} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition flex items-center gap-1 disabled:opacity-50">
+                                                            <Edit2 className="w-3 h-3" /> Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setTeamDetailsOpen(prev => ({ ...prev, [team.id]: !prev[team.id] }))}
+                                                            className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-2 rounded-md border border-neutral-700 transition"
+                                                        >
+                                                            {isExpanded ? 'Hide Updates' : 'Show Updates'}
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => setTeamToDelete(team)} 
+                                                            disabled={!canDelete}
+                                                            className="text-xs bg-red-900/20 hover:bg-red-900/40 text-red-400 px-3 py-2 rounded-md border border-red-900/30 transition flex items-center gap-1 disabled:opacity-50"
+                                                        >
+                                                            <Trash2 className="w-3 h-3" /> Delete
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                             {isExpanded && (
@@ -837,7 +833,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                     </div>
                     <div className={`bg-neutral-900 p-6 rounded-xl border border-neutral-800 ${adminCardClass}`}>
                         <h3 className="text-lg font-bold text-white mb-4">Existing Cohorts</h3>
-                        <div className="space-y-4 max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-neutral-700">
+                        <div className="space-y-4 pr-2">
                             {cohorts.length === 0 && <p className="text-sm text-neutral-500 italic">No cohorts created yet.</p>}
                             {cohorts.map(cohort => {
                                 const teamsInCohort = teams.filter(t => t.cohort_id === cohort.id);

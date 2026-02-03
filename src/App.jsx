@@ -362,6 +362,7 @@ const VentureTracker = ({ supabase, isMock }) => {
   const [viewingTeam, setViewingTeam] = useState(null); // The team being viewed in public directory
   
   const [loading, setLoading] = useState(true);
+  const [dataReady, setDataReady] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -396,18 +397,24 @@ const VentureTracker = ({ supabase, isMock }) => {
   useEffect(() => {
     if (!session) return;
 
+    let active = true;
+    setDataReady(false);
     ensureProfile(session.user);
     // Fetch Settings (runs once)
     supabase.from('settings').select('*').single().then(({ data }) => setSettings(data));
 
-    // Initial Fetch Teams
-    fetchTeams();
-    fetchAdmins();
-    fetchProfiles();
-    fetchCohorts();
-    fetchJoinRequest();
-    fetchTags();
-    fetchTeamTagsMap();
+    (async () => {
+      await Promise.all([
+        fetchTeams(),
+        fetchAdmins(),
+        fetchProfiles(),
+        fetchCohorts(),
+        fetchJoinRequest(),
+        fetchTags(),
+        fetchTeamTagsMap()
+      ]);
+      if (active) setDataReady(true);
+    })();
 
     // Set up Realtime Subscription for Teams
     const teamsSub = supabase.channel('public:teams')
@@ -433,6 +440,7 @@ const VentureTracker = ({ supabase, isMock }) => {
       supabase.removeChannel(teamsSub);
       supabase.removeChannel(cohortsSub);
       supabase.removeChannel(joinReqSub);
+      active = false;
     };
   }, [session]);
 
@@ -1363,6 +1371,7 @@ const VentureTracker = ({ supabase, isMock }) => {
 
   if (loading) return <LoadingScreen />;
   if (!session) return <AuthScreen supabase={supabase} isMock={isMock} />;
+  if (!dataReady) return <LoadingScreen />;
 
   const isRoot = session?.user?.email === ROOT_ADMIN_EMAIL;
   const currentProfile = profiles.find(p => p.id === session.user.id);
