@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, AlertCircle, Shield, X, Check } from 'lucide-react';
+import { Plus, Edit2, Trash2, AlertCircle, Shield, X, Check, Eye } from 'lucide-react';
 import TeamLogo from './TeamLogo';
 import TeamEditModal from './TeamEditModal';
 import UserCreateModal from './UserCreateModal';
@@ -661,52 +661,54 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                                             ))}
                                                         </div>
                                                     )}
+                                                    <button
+                                                        onClick={() => setTeamDetailsOpen(prev => ({ ...prev, [team.id]: !prev[team.id] }))}
+                                                        className="mt-2 text-xs text-yellow-400 hover:text-yellow-300 underline underline-offset-4 inline-flex items-center gap-1"
+                                                    >
+                                                        <Eye className="w-3 h-3" />
+                                                        {isExpanded ? 'Hide updates & feedback' : 'Show updates & feedback'}
+                                                    </button>
                                                     <div className="mt-2 flex flex-wrap gap-1">
                                                         {memberProfiles.length > 0 ? memberProfiles.map(m => (
                                                             <span key={m.id} className="px-2 py-0.5 bg-neutral-800 rounded text-xs text-neutral-300 border border-neutral-700">
                                                                 {m.email || m.full_name || m.id}
-                                                                </span>
-                                                            )) : (
-                                                                <span className="text-neutral-600 italic text-xs">No members</span>
-                                                            )}
-                                                        </div>
+                                                            </span>
+                                                        )) : (
+                                                            <span className="text-neutral-600 italic text-xs">No members</span>
+                                                        )}
                                                     </div>
                                                 </div>
-                                                <div className="flex flex-col items-start md:items-end gap-2">
-                                                    <select
-                                                        value={team.cohort_id || ''}
-                                                        onChange={(e) => onAssignCohort(team.id, e.target.value)}
-                                                        disabled={!canEdit}
-                                                        className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs rounded-md px-2 py-2 focus:ring-yellow-500 focus:border-yellow-500 disabled:opacity-50"
-                                                    >
-                                                        <option value="">Assign Cohort...</option>
-                                                        {cohorts.map(c => (
-                                                            <option key={c.id} value={c.id}>{c.name}</option>
-                                                        ))}
-                                                    </select>
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <button onClick={() => onViewTeam(team)} className="text-sm bg-yellow-600 hover:bg-yellow-500 text-black px-4 py-2 rounded-md font-bold border border-yellow-500/50 transition">
+                                            </div>
+                                            <div className="flex flex-col items-start md:items-end gap-2">
+                                                <select
+                                                    value={team.cohort_id || ''}
+                                                    onChange={(e) => onAssignCohort(team.id, e.target.value)}
+                                                    disabled={!canEdit}
+                                                    className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-xs rounded-md px-2 py-2 focus:ring-yellow-500 focus:border-yellow-500 disabled:opacity-50"
+                                                >
+                                                    <option value="">Assign Cohort...</option>
+                                                    {cohorts.map(c => (
+                                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                                    ))}
+                                                </select>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                        <button onClick={() => onViewTeam(team)} className="text-sm bg-yellow-600 hover:bg-yellow-500 text-black px-4 py-2 rounded-full font-bold border border-yellow-500/50 transition inline-flex items-center gap-2">
+                                                            <Eye className="w-4 h-4" />
                                                             View
                                                         </button>
-                                                        <button onClick={() => setEditingTeam(team)} disabled={!canEdit} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 transition flex items-center gap-1 disabled:opacity-50">
+                                                        <button onClick={() => setEditingTeam(team)} disabled={!canEdit} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-full border border-neutral-700 transition flex items-center gap-1 disabled:opacity-50">
                                                             <Edit2 className="w-3 h-3" /> Edit
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setTeamDetailsOpen(prev => ({ ...prev, [team.id]: !prev[team.id] }))}
-                                                            className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-2 rounded-md border border-neutral-700 transition"
-                                                        >
-                                                            {isExpanded ? 'Hide Updates' : 'Show Updates'}
                                                         </button>
                                                         <button 
                                                             onClick={() => setTeamToDelete(team)} 
                                                             disabled={!canDelete}
-                                                            className="text-xs bg-red-900/20 hover:bg-red-900/40 text-red-400 px-3 py-2 rounded-md border border-red-900/30 transition flex items-center gap-1 disabled:opacity-50"
+                                                            className="text-xs bg-red-900/20 hover:bg-red-900/40 text-red-400 px-3 py-2 rounded-full border border-red-900/30 transition flex items-center gap-1 disabled:opacity-50"
                                                         >
                                                             <Trash2 className="w-3 h-3" /> Delete
                                                         </button>
                                                     </div>
-                                                </div>
                                             </div>
+                                        </div>
                                             {isExpanded && (
                                                 <div className="grid md:grid-cols-2 gap-4 border-t border-neutral-800 pt-4">
                                                     <div className="space-y-2">
