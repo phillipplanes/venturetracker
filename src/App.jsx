@@ -363,6 +363,7 @@ const VentureTracker = ({ supabase, isMock }) => {
   
   const [loading, setLoading] = useState(true);
   const [dataReady, setDataReady] = useState(false);
+  const [teamResolved, setTeamResolved] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -543,6 +544,7 @@ const VentureTracker = ({ supabase, isMock }) => {
         if (mine) {
           setMyTeam(mine);
         }
+        setTeamResolved(true);
     }
   };
 
@@ -1371,7 +1373,7 @@ const VentureTracker = ({ supabase, isMock }) => {
 
   if (loading) return <LoadingScreen />;
   if (!session) return <AuthScreen supabase={supabase} isMock={isMock} />;
-  if (!dataReady) return <LoadingScreen />;
+  if (!dataReady || !teamResolved) return <LoadingScreen />;
 
   const isRoot = session?.user?.email === ROOT_ADMIN_EMAIL;
   const currentProfile = profiles.find(p => p.id === session.user.id);
