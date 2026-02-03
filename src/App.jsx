@@ -1621,10 +1621,10 @@ const VentureTracker = ({ supabase, isMock }) => {
                 )}
                 <div>
                     <h1 className="text-2xl font-bold text-white">
-                        {view === 'dashboard' && 'Team Dashboard'}
-                        {view === 'finances' && 'Financial Ledger'}
+                        {view === 'dashboard' && `${currentDisplayTeam?.name || 'Team'} - Dashboard`}
+                        {view === 'finances' && `${currentDisplayTeam?.name || 'Team'} - Financial Ledger`}
                         {view === 'all-teams' && 'Class Directory'}
-                        {view === 'team-summary' && (viewingTeam ? viewingTeam.name : 'Team Summary')}
+                        {view === 'team-summary' && (viewingTeam ? `${viewingTeam.name} - Team Summary` : 'Team Summary')}
                     </h1>
                     {view === 'team-summary' && (
                         <p className="text-neutral-500 text-sm">Public Profile</p>
@@ -1838,7 +1838,7 @@ const VentureTracker = ({ supabase, isMock }) => {
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 w-full max-w-3xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-white">Pitch Video</h3>
+              <h3 className="text-lg font-bold text-white">{myTeam?.name ? `${myTeam.name} - Pitch Video` : 'Pitch Video'}</h3>
               <button onClick={() => setShowPitchViewer(false)} className="text-neutral-400 hover:text-white">✕</button>
             </div>
             <video
