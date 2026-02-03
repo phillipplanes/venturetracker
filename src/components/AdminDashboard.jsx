@@ -651,7 +651,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                                     <TeamLogo url={team.logo_display_url || team.logo_url} name={team.name} fit="contain" className="w-12 h-12 rounded-lg bg-neutral-950 border border-neutral-800" />
                                                     <div className="min-w-0">
                                                         <h4 className="font-bold text-white">{team.name}</h4>
-                                                        <p className="text-xs text-neutral-500 line-clamp-2">{team.description || 'No description'}</p>
+                                                    <p className="text-sm text-neutral-300 line-clamp-2">{team.description || 'No description'}</p>
                                                     {(teamTagsByTeam[team.id] || []).length > 0 && (
                                                         <div className="mt-2 flex flex-wrap gap-1">
                                                             {teamTagsByTeam[team.id].map((tag, idx) => (
