@@ -334,6 +334,7 @@ const VentureTracker = ({ supabase, isMock }) => {
   const [cohorts, setCohorts] = useState([]);
   const [tags, setTags] = useState([]);
   const [teamTagIds, setTeamTagIds] = useState([]);
+  const [teamTagsByTeam, setTeamTagsByTeam] = useState({});
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [joinRequest, setJoinRequest] = useState(null);
   const [joinCohortId, setJoinCohortId] = useState('');
@@ -406,6 +407,7 @@ const VentureTracker = ({ supabase, isMock }) => {
     fetchCohorts();
     fetchJoinRequest();
     fetchTags();
+    fetchTeamTagsMap();
 
     // Set up Realtime Subscription for Teams
     const teamsSub = supabase.channel('public:teams')
@@ -660,6 +662,23 @@ const VentureTracker = ({ supabase, isMock }) => {
       if (data) setTags(data);
   };
 
+  const fetchTeamTagsMap = async () => {
+      const { data, error } = await supabase
+        .from('team_tags')
+        .select('team_id, tag:tags(name,label)');
+      if (error) {
+        console.error('Error fetching team tags:', error);
+        return;
+      }
+      const map = {};
+      (data || []).forEach((row) => {
+        const label = row.tag?.label || row.tag?.name;
+        if (!label) return;
+        if (!map[row.team_id]) map[row.team_id] = [];
+        map[row.team_id].push(label);
+      });
+      setTeamTagsByTeam(map);
+  };
   const fetchTeamTags = async (teamId) => {
       const { data } = await supabase.from('team_tags').select('tag_id').eq('team_id', teamId);
       if (data) setTeamTagIds(data.map(row => row.tag_id));
@@ -1403,6 +1422,7 @@ const VentureTracker = ({ supabase, isMock }) => {
                   onDeleteUser={handleDeleteUser}
                   onAssignCohort={handleAssignCohort}
                   onRefreshCohorts={fetchCohorts}
+                  teamTagsByTeam={teamTagsByTeam}
                   permissions={{
                     canEdit: canEditAdmin,
                     canDelete: canDeleteAdmin,

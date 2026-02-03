@@ -43,7 +43,7 @@ const ReviewPanel = ({ teamId, taskId, currentStatus, submission, onReview }) =>
     )
 }
 
-const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], settings, cohortPhasesById = {}, onUpdateSettings, onAddAdmin, onRemoveAdmin, onUpdateProfile, onViewTeam, onDeleteTeam, onCreateTeam, onUpdateTeam, onAssignCohort, onCreateUser, onDeleteUser, onRefreshCohorts, permissions = {}, uploading }) => {
+const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], settings, cohortPhasesById = {}, onUpdateSettings, onAddAdmin, onRemoveAdmin, onUpdateProfile, onViewTeam, onDeleteTeam, onCreateTeam, onUpdateTeam, onAssignCohort, onCreateUser, onDeleteUser, onRefreshCohorts, teamTagsByTeam = {}, permissions = {}, uploading }) => {
     const [tab, setTab] = useState('overview');
     const [bannerMsg, setBannerMsg] = useState(settings?.banner_message || '');
     const [pitchDate, setPitchDate] = useState(settings?.pitch_date || '');
@@ -657,11 +657,20 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                                     <TeamLogo url={team.logo_display_url || team.logo_url} name={team.name} />
                                                     <div className="min-w-0">
                                                         <h4 className="font-bold text-white">{team.name}</h4>
-                                                        <p className="text-xs text-neutral-500 line-clamp-2">{team.description || 'No description'}</p>
+                                                    <p className="text-xs text-neutral-500 line-clamp-2">{team.description || 'No description'}</p>
+                                                    {(teamTagsByTeam[team.id] || []).length > 0 && (
                                                         <div className="mt-2 flex flex-wrap gap-1">
-                                                            {memberProfiles.length > 0 ? memberProfiles.map(m => (
-                                                                <span key={m.id} className="px-2 py-0.5 bg-neutral-800 rounded text-xs text-neutral-300 border border-neutral-700">
-                                                                    {m.email || m.full_name || m.id}
+                                                            {teamTagsByTeam[team.id].map((tag, idx) => (
+                                                                <span key={`${team.id}-tag-${idx}`} className="px-2 py-0.5 bg-neutral-800 rounded text-xs text-yellow-300 border border-neutral-700">
+                                                                    {tag}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    <div className="mt-2 flex flex-wrap gap-1">
+                                                        {memberProfiles.length > 0 ? memberProfiles.map(m => (
+                                                            <span key={m.id} className="px-2 py-0.5 bg-neutral-800 rounded text-xs text-neutral-300 border border-neutral-700">
+                                                                {m.email || m.full_name || m.id}
                                                                 </span>
                                                             )) : (
                                                                 <span className="text-neutral-600 italic text-xs">No members</span>
