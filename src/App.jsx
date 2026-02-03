@@ -353,6 +353,7 @@ const VentureTracker = ({ supabase, isMock }) => {
   const pitchRecorderRef = useRef(null);
   const pitchStreamRef = useRef(null);
   const pitchChunksRef = useRef([]);
+  const lastTeamIdRef = useRef(null);
   const [theme, setTheme] = useState(() => {
     const stored = window.localStorage.getItem('theme');
     return stored || 'dark';
@@ -450,6 +451,18 @@ const VentureTracker = ({ supabase, isMock }) => {
       console.log('[Team Logo URL]', myTeam.logo_url);
     }
   }, [myTeam?.logo_url]);
+
+  useEffect(() => {
+    if (myTeam?.id) {
+      lastTeamIdRef.current = myTeam.id;
+    }
+  }, [myTeam?.id]);
+
+  useEffect(() => {
+    if (session && !myTeam && lastTeamIdRef.current) {
+      fetchTeams();
+    }
+  }, [session, myTeam]);
 
   // Fetch milestones based on the current team's cohort
   useEffect(() => {
@@ -1447,6 +1460,7 @@ const VentureTracker = ({ supabase, isMock }) => {
   }
 
   if (!myTeam) {
+    if (lastTeamIdRef.current) return <LoadingScreen />;
     const activeCohorts = cohorts.filter(c => (c.status || 'active') === 'active');
     const requestedCohort = cohorts.find(c => c.id === joinRequest?.cohort_id);
     const myProfile = profiles.find(p => p.id === session.user.id);
