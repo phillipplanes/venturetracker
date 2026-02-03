@@ -8,10 +8,14 @@ const SubmissionModal = ({
     onCancel,
     readOnly = false,
     attachmentUrl,
-    attachmentName
+    attachmentName,
+    existingEstimatedHours
 }) => {
     const [summary, setSummary] = useState(existingSummary || '');
     const [file, setFile] = useState(null);
+    const [estimatedHours, setEstimatedHours] = useState(
+        Number.isFinite(existingEstimatedHours) ? String(existingEstimatedHours) : ''
+    );
     const fileInputRef = useRef(null);
 
     return (
@@ -32,6 +36,27 @@ const SubmissionModal = ({
                     onChange={(e) => setSummary(e.target.value)}
                     readOnly={readOnly}
                 />
+
+                <div className="mt-4">
+                    <label className="block text-xs font-bold text-neutral-500 uppercase mb-2">
+                        Estimated Time (hours, optional)
+                    </label>
+                    {readOnly ? (
+                        <div className="text-sm text-neutral-300">
+                            {existingEstimatedHours ? `${existingEstimatedHours} hours` : 'Not provided'}
+                        </div>
+                    ) : (
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            value={estimatedHours}
+                            onChange={(e) => setEstimatedHours(e.target.value)}
+                            className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white text-sm focus:border-yellow-500 outline-none"
+                            placeholder="e.g., 3"
+                        />
+                    )}
+                </div>
 
                 <div className="mt-4">
                     <label className="block text-xs font-bold text-neutral-500 uppercase mb-2">
@@ -88,7 +113,10 @@ const SubmissionModal = ({
                     </button>
                     {!readOnly && (
                         <button 
-                            onClick={() => onSubmit(summary, file)}
+                            onClick={() => {
+                                const parsed = estimatedHours.trim() === '' ? null : Number.parseFloat(estimatedHours);
+                                onSubmit(summary, file, Number.isNaN(parsed) ? null : parsed);
+                            }}
                             disabled={!summary.trim()}
                             className="bg-yellow-600 text-black px-4 py-2 rounded-lg text-sm font-bold hover:bg-yellow-500 disabled:opacity-50"
                         >

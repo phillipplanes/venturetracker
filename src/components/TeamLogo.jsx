@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Rocket } from 'lucide-react';
 
-const TeamLogo = ({ url, name, className = "w-10 h-10 rounded-md", iconSize = "w-5 h-5" }) => {
+const TeamLogo = ({ url, name, className = "w-10 h-10 rounded-md", iconSize = "w-5 h-5", fit = "cover" }) => {
     const [error, setError] = useState(false);
     const [srcIndex, setSrcIndex] = useState(0);
 
@@ -45,7 +45,7 @@ const TeamLogo = ({ url, name, className = "w-10 h-10 rounded-md", iconSize = "w
         <img
             src={srcOptions[srcIndex]}
             alt={name}
-            className={`${className} object-cover flex-shrink-0 bg-neutral-800`}
+            className={`${className} ${fit === "contain" ? "object-contain" : "object-cover"} flex-shrink-0 bg-neutral-800`}
             onError={() => {
                 const nextIndex = srcIndex + 1;
                 if (nextIndex < srcOptions.length) {

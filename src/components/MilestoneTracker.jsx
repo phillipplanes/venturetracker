@@ -14,6 +14,11 @@ const ReviewPanel = ({ teamId, taskId, currentStatus, submission, onReview }) =>
                 <div className="bg-neutral-900 p-2 rounded text-neutral-300 text-sm mb-3 border border-neutral-800 italic">
                     "{submission.summary || "No summary provided."}"
                 </div>
+                {submission.estimated_hours && (
+                    <div className="mb-3 text-xs text-neutral-400">
+                        Estimated time: <span className="text-neutral-200 font-semibold">{submission.estimated_hours}h</span>
+                    </div>
+                )}
 
                 <p className="text-neutral-400 text-xs uppercase font-bold mb-2">Admin Feedback</p>
                 <input 
@@ -76,6 +81,7 @@ const MilestoneTracker = ({ team, phases, onSubmitTask, onReviewTask, onUploadPr
             <SubmissionModal 
                 task={submissionTask}
                 existingSummary={submissions[submissionTask.id]?.summary}
+                existingEstimatedHours={submissions[submissionTask.id]?.estimated_hours}
                 attachmentUrl={
                     (() => {
                         const proof = taskEvidence[submissionTask.id];
@@ -89,8 +95,8 @@ const MilestoneTracker = ({ team, phases, onSubmitTask, onReviewTask, onUploadPr
                     })()
                 }
                 readOnly={isViewingSubmission}
-                onSubmit={(summary, file) => {
-                    onSubmitTask(submissionTask.id, summary, file);
+                onSubmit={(summary, file, estimatedHours) => {
+                    onSubmitTask(submissionTask.id, summary, file, estimatedHours);
                     setSubmissionTask(null);
                     setIsViewingSubmission(false);
                 }}
@@ -193,6 +199,9 @@ const MilestoneTracker = ({ team, phases, onSubmitTask, onReviewTask, onUploadPr
                                         </span>
                                         {status === 'pending' && <span className="text-[10px] text-yellow-600 uppercase font-bold tracking-wider">Pending Approval</span>}
                                         {status === 'approved' && <span className="text-[10px] text-green-600 uppercase font-bold tracking-wider">Approved</span>}
+                                        {submission.estimated_hours && (
+                                            <span className="text-[10px] text-neutral-500">Estimated: {submission.estimated_hours}h</span>
+                                        )}
                                         
                                         {!readOnly && status === 'rejected' && submission.feedback && (
                                             <span className="text-xs text-red-400 mt-1">Feedback: "{submission.feedback}"</span>

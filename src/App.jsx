@@ -338,6 +338,20 @@ const VentureTracker = ({ supabase, isMock }) => {
   const [joinRequest, setJoinRequest] = useState(null);
   const [joinCohortId, setJoinCohortId] = useState('');
   const [joinSubmitting, setJoinSubmitting] = useState(false);
+  const [showPitchRecorder, setShowPitchRecorder] = useState(false);
+  const [showPitchViewer, setShowPitchViewer] = useState(false);
+  const [isRecordingPitch, setIsRecordingPitch] = useState(false);
+  const [pitchPreviewUrl, setPitchPreviewUrl] = useState('');
+  const [pitchSecondsLeft, setPitchSecondsLeft] = useState(30);
+  const [pitchCountdown, setPitchCountdown] = useState(0);
+  const pitchTimerRef = useRef(null);
+  const pitchCountdownRef = useRef(null);
+  const [pitchRecordingStart, setPitchRecordingStart] = useState(null);
+  const [pitchCountdownStart, setPitchCountdownStart] = useState(null);
+  const pitchVideoRef = useRef(null);
+  const pitchRecorderRef = useRef(null);
+  const pitchStreamRef = useRef(null);
+  const pitchChunksRef = useRef([]);
   const [theme, setTheme] = useState(() => {
     const stored = window.localStorage.getItem('theme');
     return stored || 'dark';
@@ -509,13 +523,16 @@ const VentureTracker = ({ supabase, isMock }) => {
             return {
               ...team,
               logo_display_url: await getSignedAssetUrl(team.logo_url),
+              pitch_video_display_url: await getSignedAssetUrl(team.pitch_video_url),
               task_evidence_display: Object.fromEntries(evidenceEntries)
             };
           })
         );
         setAllTeams(enriched);
         const mine = enriched.find(t => t.members && t.members.includes(session.user.id));
-        setMyTeam(mine);
+        if (mine) {
+          setMyTeam(mine);
+        }
     }
   };
 
@@ -755,6 +772,20 @@ const VentureTracker = ({ supabase, isMock }) => {
     return fileName;
   };
 
+  const uploadPitchVideo = async (blob) => {
+    if (!blob || !myTeam) return null;
+    const fileName = `team_${myTeam.id}/pitch/${Date.now()}_pitch.webm`;
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(fileName, blob, { contentType: 'video/webm' });
+    if (error) {
+      console.error('Pitch upload error:', error);
+      alert('Video upload failed. Check console.');
+      return null;
+    }
+    return data.path;
+  };
+
   // --- Actions ---
 
   const handleCreateTeam = async (name, description, logoFile) => {
@@ -788,6 +819,121 @@ const VentureTracker = ({ supabase, isMock }) => {
     const newMembers = [...(currentMembers || []), session.user.id];
     const { error } = await supabase.from('teams').update({ members: newMembers }).eq('id', teamId);
     if (!error) fetchTeams();
+  };
+
+  const startPitchRecording = async () => {
+    try {
+      if (pitchStreamRef.current) {
+        pitchStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      if (pitchTimerRef.current) {
+        clearInterval(pitchTimerRef.current);
+      }
+      if (pitchCountdownRef.current) {
+        clearInterval(pitchCountdownRef.current);
+      }
+      const countdownStart = Date.now();
+      setPitchCountdown(3);
+      setPitchCountdownStart(countdownStart);
+      setPitchSecondsLeft(30);
+      pitchCountdownRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - countdownStart) / 1000);
+        const remaining = Math.max(0, 3 - elapsed);
+        setPitchCountdown(remaining);
+        if (remaining === 0) {
+          clearInterval(pitchCountdownRef.current);
+          pitchCountdownRef.current = null;
+        }
+      }, 250);
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      const recordingStart = Date.now();
+      setPitchRecordingStart(recordingStart);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      pitchStreamRef.current = stream;
+      if (pitchVideoRef.current) {
+        pitchVideoRef.current.srcObject = stream;
+      }
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9,opus' });
+      pitchRecorderRef.current = recorder;
+      pitchChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) pitchChunksRef.current.push(e.data);
+      };
+      recorder.onstop = async () => {
+        const blob = new Blob(pitchChunksRef.current, { type: 'video/webm' });
+        const previewUrl = URL.createObjectURL(blob);
+        setPitchPreviewUrl(previewUrl);
+        if (pitchTimerRef.current) {
+          clearInterval(pitchTimerRef.current);
+        }
+      };
+      recorder.start();
+      setIsRecordingPitch(true);
+      pitchTimerRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - recordingStart) / 1000);
+        const remaining = Math.max(0, 30 - elapsed);
+        setPitchSecondsLeft(remaining);
+        if (remaining === 0) {
+          if (recorder.state === 'recording') recorder.stop();
+          stream.getTracks().forEach((t) => t.stop());
+          setIsRecordingPitch(false);
+          clearInterval(pitchTimerRef.current);
+        }
+      }, 250);
+    } catch (error) {
+      console.error('Pitch recording error:', error);
+      alert('Unable to access camera/microphone.');
+    }
+  };
+
+  const stopPitchRecording = () => {
+    const recorder = pitchRecorderRef.current;
+    const stream = pitchStreamRef.current;
+    if (recorder && recorder.state === 'recording') {
+      recorder.stop();
+    }
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+    }
+    setIsRecordingPitch(false);
+    if (pitchTimerRef.current) {
+      clearInterval(pitchTimerRef.current);
+    }
+    if (pitchCountdownRef.current) {
+      clearInterval(pitchCountdownRef.current);
+      pitchCountdownRef.current = null;
+    }
+    setPitchCountdown(0);
+  };
+
+  const retakePitchVideo = () => {
+    setPitchPreviewUrl('');
+    setPitchSecondsLeft(30);
+    setPitchCountdown(0);
+    setPitchRecordingStart(null);
+    setPitchCountdownStart(null);
+  };
+
+  const savePitchVideo = async () => {
+    if (!pitchPreviewUrl || !myTeam) return;
+    setUploading(true);
+    const res = await fetch(pitchPreviewUrl);
+    const blob = await res.blob();
+    const path = await uploadPitchVideo(blob);
+    if (path) {
+      const { error } = await supabase.from('teams').update({ pitch_video_url: path }).eq('id', myTeam.id);
+      if (error) {
+        console.error('Pitch save error:', error);
+        alert('Failed to save pitch video.');
+      } else {
+        const signed = await getSignedAssetUrl(path);
+        setMyTeam((prev) => prev ? { ...prev, pitch_video_url: path, pitch_video_display_url: signed } : prev);
+        await fetchTeams();
+        setShowPitchRecorder(false);
+        setPitchPreviewUrl('');
+      }
+    }
+    setUploading(false);
   };
 
   const handleAssignCohort = async (teamId, cohortId) => {
@@ -835,7 +981,7 @@ const VentureTracker = ({ supabase, isMock }) => {
     }
   };
 
-  const handleSubmitTask = async (taskId, summary, file) => {
+  const handleSubmitTask = async (taskId, summary, file, estimatedHours) => {
     if (!myTeam) return;
 
     setUploading(true);
@@ -850,6 +996,7 @@ const VentureTracker = ({ supabase, isMock }) => {
         task_id: taskId,
         status: 'pending',
         summary: summary,
+        estimated_hours: estimatedHours ?? null,
         submitted_at: new Date().toISOString(),
     };
 
@@ -1492,23 +1639,55 @@ const VentureTracker = ({ supabase, isMock }) => {
                 <div className="grid lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-6">
                     <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800 shadow-sm relative overflow-hidden">
-                        <div className="flex justify-between items-start relative z-10">
-                            <div className="flex items-center gap-4">
-                                <TeamLogo url={myTeam?.logo_display_url || myTeam?.logo_url} name={myTeam?.name} className="w-16 h-16 rounded-lg" iconSize="w-8 h-8" />
-                                <div>
-                                    <h2 className="text-xl font-bold text-white">{myTeam?.name}</h2>
-                                    <p className="text-neutral-400 mt-1">{myTeam?.description}</p>
-                                    <button
-                                        onClick={() => setIsEditingProfile(true)}
-                                        className="mt-2 text-xs text-neutral-400 hover:text-white underline underline-offset-4"
-                                    >
-                                        Edit description and logo
-                                    </button>
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-4">
+                                    <TeamLogo url={myTeam?.logo_display_url || myTeam?.logo_url} name={myTeam?.name} className="w-16 h-16 rounded-lg bg-neutral-950 border border-neutral-800" iconSize="w-8 h-8" fit="contain" />
+                                    <h2 className="text-2xl font-bold text-white">{myTeam?.name}</h2>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-3xl font-bold text-yellow-500">{progressPercent}%</div>
+                                    <p className="text-xs text-neutral-500">Total Approved</p>
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <div className="text-3xl font-bold text-yellow-500">{progressPercent}%</div>
-                                <p className="text-xs text-neutral-500">Total Approved</p>
+                            <div>
+                                <p className="text-neutral-400">{myTeam?.description}</p>
+                                <button
+                                    onClick={() => setIsEditingProfile(true)}
+                                    className="mt-2 text-xs text-neutral-400 hover:text-white underline underline-offset-4"
+                                >
+                                    Edit description and logo
+                                </button>
+                            </div>
+                        </div>
+                        <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                {myTeam?.pitch_video_display_url ? (
+                                    <button
+                                        onClick={() => setShowPitchViewer(true)}
+                                        className="w-40 h-24 rounded-lg border border-neutral-800 overflow-hidden bg-black"
+                                        title="Watch pitch video"
+                                    >
+                                        <video
+                                            src={myTeam.pitch_video_display_url}
+                                            className="w-full h-full object-cover"
+                                            muted
+                                        />
+                                    </button>
+                                ) : (
+                                    <div className="w-40 h-24 rounded-lg border border-dashed border-neutral-700 flex items-center justify-center text-xs text-neutral-500">
+                                        No pitch video yet
+                                    </div>
+                                )}
+                                <div>
+                                    <p className="text-xs text-neutral-400">30-second pitch video</p>
+                                    <button
+                                        onClick={() => setShowPitchRecorder(true)}
+                                        className="text-xs bg-neutral-800 hover:bg-neutral-700 text-white px-3 py-2 rounded-md border border-neutral-700 mt-2"
+                                    >
+                                        {myTeam?.pitch_video_display_url ? 'Replace Video' : 'Record Video'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1590,6 +1769,85 @@ const VentureTracker = ({ supabase, isMock }) => {
           onSave={handleUpdateTeamProfile}
           onSaveTags={handleSaveTeamTags}
         />
+      )}
+      {showPitchRecorder && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 w-full max-w-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white">Record 30-second Pitch</h3>
+              <button onClick={() => { setShowPitchRecorder(false); stopPitchRecording(); }} className="text-neutral-400 hover:text-white">✕</button>
+            </div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs text-neutral-400">Time left</span>
+              <span className="text-xl font-black tracking-wide text-yellow-400">{pitchSecondsLeft}s</span>
+            </div>
+            {!pitchPreviewUrl ? (
+              <div className="bg-neutral-950 border border-neutral-800 rounded-lg overflow-hidden relative">
+                <video ref={pitchVideoRef} className="w-full h-64 bg-black" autoPlay muted playsInline />
+                {pitchCountdown > 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="text-6xl font-black text-white bg-black/60 px-6 py-3 rounded-2xl">
+                      {pitchCountdown}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-4">
+                <p className="text-xs text-neutral-500 mb-2">Preview</p>
+                <video src={pitchPreviewUrl} className="w-full h-48 bg-black rounded-lg" controls />
+              </div>
+            )}
+            <div className="mt-4 flex flex-wrap gap-3">
+              {!isRecordingPitch ? (
+                <button
+                  onClick={startPitchRecording}
+                  disabled={pitchCountdown > 0}
+                  className="bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg hover:bg-yellow-500"
+                >
+                  Start Video
+                </button>
+              ) : (
+                <button
+                  onClick={stopPitchRecording}
+                  className="bg-red-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-red-500"
+                >
+                  End Video
+                </button>
+              )}
+              <button
+                onClick={retakePitchVideo}
+                disabled={isRecordingPitch || !pitchPreviewUrl}
+                className="bg-neutral-800 text-white px-4 py-2 rounded-lg border border-neutral-700 disabled:opacity-50"
+              >
+                Re-take
+              </button>
+              <button
+                onClick={savePitchVideo}
+                disabled={!pitchPreviewUrl || uploading}
+                className="bg-neutral-800 text-white px-4 py-2 rounded-lg border border-neutral-700 disabled:opacity-50"
+              >
+                {uploading ? 'Saving...' : 'Save Video'}
+              </button>
+            </div>
+            <p className="text-xs text-neutral-500 mt-3">Recording auto-stops at 30 seconds.</p>
+          </div>
+        </div>
+      )}
+      {showPitchViewer && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 w-full max-w-3xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white">Pitch Video</h3>
+              <button onClick={() => setShowPitchViewer(false)} className="text-neutral-400 hover:text-white">✕</button>
+            </div>
+            <video
+              src={myTeam?.pitch_video_display_url}
+              className="w-full max-h-[70vh] rounded-lg bg-black"
+              controls
+            />
+          </div>
+        </div>
       )}
     </div>
   );
