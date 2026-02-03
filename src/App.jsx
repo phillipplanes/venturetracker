@@ -556,6 +556,7 @@ const VentureTracker = ({ supabase, isMock }) => {
   const handleSubmitJoinRequest = async () => {
       if (!joinCohortId || !session?.user) return;
       setJoinSubmitting(true);
+      const cohortName = cohorts.find(c => c.id === joinCohortId)?.name || '';
       const { data, error } = await supabase
         .from('cohort_join_requests')
         .insert([{
@@ -570,6 +571,17 @@ const VentureTracker = ({ supabase, isMock }) => {
         alert('Failed to submit cohort request: ' + error.message);
       } else {
         setJoinRequest(data);
+        try {
+          await supabase.functions.invoke('send-cohort-email', {
+            body: {
+              type: 'request',
+              email: session.user.email,
+              cohortName
+            }
+          });
+        } catch (err) {
+          console.warn('Failed to send request email:', err);
+        }
       }
       setJoinSubmitting(false);
   };
@@ -597,11 +609,13 @@ const VentureTracker = ({ supabase, isMock }) => {
             email: user.email,
             full_name: user.user_metadata?.full_name || user.user_metadata?.name || null,
             avatar_url: user.user_metadata?.avatar_url || null,
-            role: 'viewer'
+            role: 'student'
           }]);
         if (insertError) {
-          console.error('Failed to insert profile:', insertError);
-          return;
+          if (insertError.code !== '23505') {
+            console.error('Failed to insert profile:', insertError);
+            return;
+          }
         }
       } else {
         const existing = data[0];
@@ -972,7 +986,27 @@ const VentureTracker = ({ supabase, isMock }) => {
   const handleUpdateProfile = async (id, updates) => {
       setProfiles(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
       const { error } = await supabase.from('profiles').update(updates).eq('id', id);
-      if (error) console.error("Error updating profile:", error);
+      if (error) {
+          console.error("Error updating profile:", error);
+      }
+      if (updates?.role) {
+          const profile = profiles.find(p => p.id === id);
+          const email = profile?.email;
+          if (email) {
+              if (updates.role === 'admin') {
+                  const existing = adminList.some(a => a.email === email);
+                  if (!existing) {
+                      await supabase.from('admins').insert([{ email }]);
+                  }
+              } else {
+                  const existing = adminList.find(a => a.email === email);
+                  if (existing) {
+                      await supabase.from('admins').delete().eq('id', existing.id);
+                  }
+              }
+              fetchAdmins();
+          }
+      }
   };
 
   const handleUpdateTeamProfile = async ({ description, logoFile }) => {
@@ -1109,21 +1143,44 @@ const VentureTracker = ({ supabase, isMock }) => {
       if (!window.confirm(confirmText)) return;
       setUploading(true);
       try {
+        console.log('[DeleteUser] Starting for', profile.id);
         const affectedTeams = allTeams.filter(t => (t.members || []).includes(profile.id));
-        await Promise.all(
+        const teamResults = await Promise.all(
           affectedTeams.map(team => {
             const nextMembers = (team.members || []).filter(id => id !== profile.id);
             return supabase.from('teams').update({ members: nextMembers }).eq('id', team.id);
           })
         );
+        teamResults.forEach((res) => {
+          if (res?.error) console.error('Team update error:', res.error);
+        });
+        const joinDelete = await supabase.from('cohort_join_requests').delete().eq('user_id', profile.id).select('id');
+        if (joinDelete.error) console.error('Join request delete error:', joinDelete.error);
+        if (!joinDelete.error && (joinDelete.data || []).length === 0) {
+          console.warn('Join request delete: no rows deleted');
+        }
         const adminRow = adminList.find(a => a.email === profile.email);
         if (adminRow) {
-          await supabase.from('admins').delete().eq('id', adminRow.id);
+          const adminDelete = await supabase.from('admins').delete().eq('id', adminRow.id).select('id');
+          if (adminDelete.error) console.error('Admin delete error:', adminDelete.error);
+          if (!adminDelete.error && (adminDelete.data || []).length === 0) {
+            console.warn('Admin delete: no rows deleted');
+          }
         }
-        await supabase.from('profiles').delete().eq('id', profile.id);
+        const profileDelete = await supabase.from('profiles').delete().eq('id', profile.id).select('id');
+        if (profileDelete.error) console.error('Profile delete error:', profileDelete.error);
+        if (!profileDelete.error && (profileDelete.data || []).length === 0) {
+          console.warn('Profile delete: no rows deleted');
+        }
         await fetchTeams();
         await fetchAdmins();
         await fetchProfiles();
+        const stillExists = profiles.some(p => p.id === profile.id);
+        if (stillExists) {
+          alert('Delete did not complete. Check RLS policies for profiles/admins/teams/cohort_join_requests.');
+        } else {
+          alert('User deleted.');
+        }
       } catch (error) {
         console.error('Failed to delete user:', error);
         alert('Failed to delete user. Check console for details.');
@@ -1142,7 +1199,16 @@ const VentureTracker = ({ supabase, isMock }) => {
   if (!session) return <AuthScreen supabase={supabase} isMock={isMock} />;
 
   const isRoot = session?.user?.email === ROOT_ADMIN_EMAIL;
-  const isAuthorizedAdmin = isRoot || adminList.some(a => a.email === session?.user?.email);
+  const currentProfile = profiles.find(p => p.id === session.user.id);
+  const currentRole = currentProfile?.role || 'student';
+  const roleAllowsAdminView = ['admin', 'professor', 'mentor'].includes(currentRole);
+  const isAuthorizedAdmin = isRoot || adminList.some(a => a.email === session?.user?.email) || roleAllowsAdminView;
+  const canEditAdmin = currentRole === 'admin' || currentRole === 'professor' || isRoot;
+  const canDeleteAdmin = currentRole === 'admin' || isRoot;
+  const canManageRoles = currentRole === 'admin' || isRoot;
+  const canApproveCohorts = currentRole === 'admin' || currentRole === 'professor' || isRoot;
+  const canPostNotes = currentRole === 'admin' || currentRole === 'professor' || currentRole === 'mentor' || isRoot;
+  const canReviewTasks = currentRole === 'admin' || currentRole === 'professor' || isRoot;
 
   const getBannerMessage = () => {
     const teamForBanner = view === 'team-summary' ? viewingTeam : myTeam;
@@ -1189,6 +1255,13 @@ const VentureTracker = ({ supabase, isMock }) => {
                   onCreateUser={handleCreateUser}
                   onDeleteUser={handleDeleteUser}
                   onAssignCohort={handleAssignCohort}
+                  onRefreshCohorts={fetchCohorts}
+                  permissions={{
+                    canEdit: canEditAdmin,
+                    canDelete: canDeleteAdmin,
+                    canManageRoles,
+                    canApprove: canApproveCohorts
+                  }}
                   supabase={supabase}
               />
           </div>
@@ -1446,13 +1519,13 @@ const VentureTracker = ({ supabase, isMock }) => {
                         onReviewTask={handleReviewTask}
                         onUploadProof={handleUploadProof} 
                         uploading={uploading}
-                        isAdmin={isAdmin}
+                        isAdmin={canReviewTasks && isAdmin}
                     />
                 </div>
                 <div className="space-y-6">
                     <ProfessorFeedback 
                         team={myTeam}
-                        isAdmin={isAdmin}
+                        canPostNotes={canPostNotes}
                         onPostFeedback={handlePostFeedback}
                         uploading={uploading}
                     />

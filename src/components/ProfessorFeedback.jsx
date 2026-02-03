@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { MessageSquare, Search, ArrowDownWideNarrow, ArrowUpWideNarrow } from 'lucide-react';
 
-const ProfessorFeedback = ({ team, isAdmin, onPostFeedback, uploading }) => {
+const ProfessorFeedback = ({ team, canPostNotes, onPostFeedback, uploading }) => {
     const [note, setNote] = useState('');
     const [query, setQuery] = useState('');
     const [sortNewest, setSortNewest] = useState(true);
@@ -28,19 +28,19 @@ const ProfessorFeedback = ({ team, isAdmin, onPostFeedback, uploading }) => {
         setNote('');
     };
 
-    if (!isAdmin && feedbackList.length === 0) return null;
+    if (!canPostNotes && feedbackList.length === 0) return null;
 
     return (
         <div className="bg-neutral-900 p-6 rounded-xl border border-neutral-800 shadow-sm">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-white flex items-center gap-2">
                     <MessageSquare className="w-5 h-5 text-yellow-500" />
-                    Professor Feedback
+                    Team Notes
                 </h3>
                 <span className="text-xs text-neutral-500">{feedbackList.length} total</span>
             </div>
 
-            {isAdmin && (
+            {canPostNotes && (
                 <div className="mb-6">
                     <textarea 
                         className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white text-sm h-24 focus:border-yellow-500 outline-none resize-none placeholder-neutral-600"
@@ -87,7 +87,7 @@ const ProfessorFeedback = ({ team, isAdmin, onPostFeedback, uploading }) => {
                     <div key={idx} className="bg-neutral-950/50 border border-neutral-800 p-4 rounded-lg">
                         <div className="flex justify-between items-start mb-2">
                             <div>
-                                <span className="text-yellow-500 text-xs font-bold uppercase">Admin Note</span>
+                                <span className="text-yellow-500 text-xs font-bold uppercase">Staff Note</span>
                                 {item.author_email && <span className="text-neutral-500 text-xs ml-2">— {item.author_email}</span>}
                             </div>
                             <span className="text-neutral-500 text-[10px]">{new Date(item.created_at).toLocaleDateString()}</span>
@@ -95,7 +95,7 @@ const ProfessorFeedback = ({ team, isAdmin, onPostFeedback, uploading }) => {
                         <p className="text-neutral-300 text-sm whitespace-pre-wrap">{item.content}</p>
                     </div>
                 ))}
-                {filteredFeedback.length === 0 && isAdmin && (
+                {filteredFeedback.length === 0 && canPostNotes && (
                     <p className="text-neutral-600 text-sm italic text-center">No feedback notes yet.</p>
                 )}
                 {filteredFeedback.length > visibleCount && (
