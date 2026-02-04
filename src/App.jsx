@@ -1384,12 +1384,8 @@ const VentureTracker = ({ supabase, isMock }) => {
       await supabase.from('transactions').delete().eq('id', id);
   };
 
-  if (loading) return <LoadingScreen />;
-  if (!session) return <AuthScreen supabase={supabase} isMock={isMock} />;
-  if (!dataReady || !teamResolved) return <LoadingScreen />;
-
   const isRoot = session?.user?.email === ROOT_ADMIN_EMAIL;
-  const currentProfile = profiles.find(p => p.id === session.user.id);
+  const currentProfile = profiles.find(p => p.id === session?.user?.id);
   const currentRole = currentProfile?.role || 'student';
   const roleAllowsAdminView = ['admin', 'professor', 'mentor'].includes(currentRole);
   const isAuthorizedAdmin = isRoot || adminList.some(a => a.email === session?.user?.email) || roleAllowsAdminView;
@@ -1405,6 +1401,10 @@ const VentureTracker = ({ supabase, isMock }) => {
       setView('admin-dashboard');
     }
   }, [currentRole]);
+
+  if (loading) return <LoadingScreen />;
+  if (!session) return <AuthScreen supabase={supabase} isMock={isMock} />;
+  if (!dataReady || !teamResolved) return <LoadingScreen />;
 
   const getBannerMessage = () => {
     const teamForBanner = view === 'team-summary' ? viewingTeam : myTeam;
