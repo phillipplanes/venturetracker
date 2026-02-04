@@ -1400,6 +1400,12 @@ const VentureTracker = ({ supabase, isMock }) => {
   const canPostNotes = currentRole === 'admin' || currentRole === 'professor' || currentRole === 'mentor' || isRoot;
   const canReviewTasks = currentRole === 'admin' || currentRole === 'professor' || isRoot;
 
+  useEffect(() => {
+    if (currentRole === 'professor') {
+      setView('admin-dashboard');
+    }
+  }, [currentRole]);
+
   const getBannerMessage = () => {
     const teamForBanner = view === 'team-summary' ? viewingTeam : myTeam;
     const cohort = cohorts.find(c => c.id === teamForBanner?.cohort_id);
