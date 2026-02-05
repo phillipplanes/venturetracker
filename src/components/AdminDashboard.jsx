@@ -69,6 +69,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     const [teamCohortFilter, setTeamCohortFilter] = useState('');
     const [dragTask, setDragTask] = useState(null);
     const [joinRequests, setJoinRequests] = useState([]);
+    const [refreshingRequests, setRefreshingRequests] = useState(false);
     const [teamUpdatesById, setTeamUpdatesById] = useState({});
     const [teamDetailsOpen, setTeamDetailsOpen] = useState({});
     const adminCardClass = "w-full";
@@ -241,6 +242,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     };
 
     const fetchJoinRequests = async () => {
+        setRefreshingRequests(true);
         const { data, error } = await supabase
             .from('cohort_join_requests')
             .select('*')
@@ -250,6 +252,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
         } else {
             setJoinRequests(data || []);
         }
+        setRefreshingRequests(false);
     };
 
     const fetchTeamUpdates = async () => {
@@ -1069,7 +1072,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                     onClick={fetchJoinRequests}
                                     className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-2 rounded-md border border-neutral-700 transition"
                                 >
-                                    Refresh
+                                    {refreshingRequests ? 'Refreshing...' : 'Refresh'}
                                 </button>
                             </div>
                             <div className="space-y-2">
