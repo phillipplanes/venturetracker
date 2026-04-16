@@ -72,6 +72,7 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
     const [refreshingRequests, setRefreshingRequests] = useState(false);
     const [teamUpdatesById, setTeamUpdatesById] = useState({});
     const [teamDetailsOpen, setTeamDetailsOpen] = useState({});
+    const [collapsedCohortsTeams, setCollapsedCohortsTeams] = useState({});
     const adminCardClass = "w-full";
     const adminFormClass = "w-full max-w-4xl mx-auto";
     const canEdit = permissions.canEdit !== false;
@@ -1026,30 +1027,40 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                           )}
                                         </div>
                                         <div className="mt-3">
-                                          <label className="block text-[10px] text-neutral-500 uppercase mb-2">Teams in Cohort</label>
-                                          <div className="space-y-2 max-w-md">
-                                            {teams.filter(t => t.cohort_id === cohort.id).map(team => {
-                                              const phases = cohortPhasesById[cohort.id] || [];
-                                              const taskIdSet = new Set(phases.flatMap(p => (p.tasks || []).map(t => t.id)));
-                                              const submissions = (team.team_submissions || []).reduce((acc, sub) => {
-                                                acc[sub.task_id] = sub;
-                                                return acc;
-                                              }, {});
-                                              const approvedCount = Object.values(submissions).filter(s => taskIdSet.has(s.task_id) && s.status === 'approved').length;
-                                              const totalTasks = taskIdSet.size;
-                                              const progress = totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
-
-                                              return (
-                                                <div key={team.id} className="flex items-center justify-between bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2">
-                                                  <span className="text-xs text-neutral-200 truncate">{team.name}</span>
-                                                  <span className="text-xs text-yellow-400 font-bold">{progress}%</span>
-                                                </div>
-                                              );
-                                            })}
-                                            {teams.filter(t => t.cohort_id === cohort.id).length === 0 && (
-                                              <p className="text-xs text-neutral-500 italic">No teams assigned.</p>
-                                            )}
+                                          <div className="flex items-center justify-between mb-2">
+                                            <label className="block text-[10px] text-neutral-500 uppercase">Teams in Cohort</label>
+                                            <button
+                                                onClick={() => setCollapsedCohortsTeams(prev => ({ ...prev, [cohort.id]: !prev[cohort.id] }))}
+                                                className="text-neutral-400 hover:text-white"
+                                            >
+                                                {collapsedCohortsTeams[cohort.id] ? <Eye className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                                            </button>
                                           </div>
+                                          {!collapsedCohortsTeams[cohort.id] && (
+                                            <div className="space-y-2 max-w-md">
+                                              {teams.filter(t => t.cohort_id === cohort.id).map(team => {
+                                                const phases = cohortPhasesById[cohort.id] || [];
+                                                const taskIdSet = new Set(phases.flatMap(p => (p.tasks || []).map(t => t.id)));
+                                                const submissions = (team.team_submissions || []).reduce((acc, sub) => {
+                                                  acc[sub.task_id] = sub;
+                                                  return acc;
+                                                }, {});
+                                                const approvedCount = Object.values(submissions).filter(s => taskIdSet.has(s.task_id) && s.status === 'approved').length;
+                                                const totalTasks = taskIdSet > 0 ? taskIdSet.size : 1; // Avoid division by zero
+                                                const progress = totalTasks > 0 ? Math.round((approvedCount / totalTasks) * 100) : 0;
+
+                                                return (
+                                                  <div key={team.id} className="flex items-center justify-between bg-neutral-900 border border-neutral-800 rounded-md px-3 py-2">
+                                                    <span className="text-xs text-neutral-200 truncate">{team.name}</span>
+                                                    <span className="text-xs text-yellow-400 font-bold">{progress}%</span>
+                                                  </div>
+                                                );
+                                              })}
+                                              {teams.filter(t => t.cohort_id === cohort.id).length === 0 && (
+                                                <p className="text-xs text-neutral-500 italic">No teams assigned.</p>
+                                              )}
+                                            </div>
+                                          )}
                                         </div>
                                     </div>
                                 );
