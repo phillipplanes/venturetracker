@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, AlertCircle, Shield, X, Check, Eye } from 'lucide-react';
+import { Plus, Edit2, Trash2, AlertCircle, Shield, X, Check, Eye, ChevronUp, ChevronDown } from 'lucide-react';
 import TeamLogo from './TeamLogo';
 import TeamEditModal from './TeamEditModal';
 import UserCreateModal from './UserCreateModal';
@@ -1031,9 +1031,10 @@ const AdminDashboard = ({ supabase, teams = [], admins = [], profiles = [], sett
                                             <label className="block text-[10px] text-neutral-500 uppercase">Teams in Cohort</label>
                                             <button
                                                 onClick={() => setCollapsedCohortsTeams(prev => ({ ...prev, [cohort.id]: !prev[cohort.id] }))}
-                                                className="text-neutral-400 hover:text-white"
+                                                className="text-neutral-400 hover:text-white flex items-center gap-1 text-xs"
                                             >
-                                                {collapsedCohortsTeams[cohort.id] ? <Eye className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                                                {collapsedCohortsTeams[cohort.id] ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                                                {collapsedCohortsTeams[cohort.id] ? 'Expand' : 'Collapse'}
                                             </button>
                                           </div>
                                           {!collapsedCohortsTeams[cohort.id] && (
